@@ -2099,16 +2099,19 @@ function FeedbackPanel({screen}){
   const tagColors=["#EBF0FF","#E8FFF3","#FFF8E0","#FFE8E8","#F5E8FF","#E8F8FF","#F0FFE8"];
   const tagTextColors=[accent,"#00875A","#996600","#CC0000","#6600CC","#0077CC","#2D8000"];
 
-  return <div style={{display:"flex",flexDirection:"column",width:open?340:48,transition:"width .25s cubic-bezier(.16,1,.3,1)",flexShrink:0,position:"sticky",top:0,height:"100vh",alignSelf:"flex-start"}}>
-    {/* 토글 탭 */}
-    <button onClick={()=>setOpen(o=>!o)} title={open?"의견 패널 닫기":"의견 패널 열기"}
-      style={{position:"absolute",left:-1,top:20,width:24,height:56,background:accent,border:"none",borderRadius:"8px 0 0 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,zIndex:10,boxShadow:"-2px 0 8px rgba(0,65,255,.15)"}}>
-      <div style={{width:2,height:12,background:"rgba(255,255,255,.9)",borderRadius:1,transform:open?"rotate(30deg)":"rotate(-30deg)",transformOrigin:"center",transition:"transform .2s"}}/>
-      <div style={{width:2,height:12,background:"rgba(255,255,255,.9)",borderRadius:1,transform:open?"rotate(-30deg)":"rotate(30deg)",transformOrigin:"center",transition:"transform .2s"}}/>
-      {!open&&count>0&&<div style={{position:"absolute",top:-6,right:-4,background:"#FF3B3B",borderRadius:10,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 3px"}}>{count}</div>}
-    </button>
+  return <div style={{display:"flex",flexDirection:"row",flexShrink:0,position:"sticky",top:0,height:"100vh",alignSelf:"flex-start"}}>
+    {/* 토글 버튼 — 패널과 별도 컬럼, 겹침 없음 */}
+    <div style={{width:28,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:20,flexShrink:0}}>
+      <button onClick={()=>setOpen(o=>!o)} title={open?"의견 패널 닫기":"의견 패널 열기"}
+        style={{width:24,height:56,background:accent,border:"none",borderRadius:"8px 0 0 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,boxShadow:"-2px 0 8px rgba(0,65,255,.15)",position:"relative",flexShrink:0}}>
+        <div style={{width:2,height:12,background:"rgba(255,255,255,.9)",borderRadius:1,transform:open?"rotate(30deg)":"rotate(-30deg)",transformOrigin:"center",transition:"transform .2s"}}/>
+        <div style={{width:2,height:12,background:"rgba(255,255,255,.9)",borderRadius:1,transform:open?"rotate(-30deg)":"rotate(30deg)",transformOrigin:"center",transition:"transform .2s"}}/>
+        {!open&&count>0&&<div style={{position:"absolute",top:-6,right:-4,background:"#FF3B3B",borderRadius:10,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 3px"}}>{count}</div>}
+      </button>
+    </div>
 
-    {open&&<div style={{flex:1,display:"flex",flexDirection:"column",background:panelBg,borderLeft:`1.5px solid ${border}`,height:"100vh",overflowY:"hidden"}}>
+    {/* 패널 콘텐츠 */}
+    {open&&<div style={{width:320,display:"flex",flexDirection:"column",background:panelBg,borderLeft:`1.5px solid ${border}`,height:"100vh",overflowY:"hidden",transition:"width .25s cubic-bezier(.16,1,.3,1)"}}>
       {/* 헤더 */}
       <div style={{padding:"16px 16px 12px",borderBottom:`1px solid ${border}`,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
