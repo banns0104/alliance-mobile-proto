@@ -12,7 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:#d6d6d6;font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;color:#363636;font-size:14px;line-height:1;}
+body{background:#1a1a2e;font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;color:#363636;font-size:14px;line-height:1;min-height:100vh;display:flex;align-items:flex-start;justify-content:flex-start;}
 button,input,select,textarea{font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;color:#363636;outline:none;-webkit-appearance:none;}
 input::placeholder,textarea::placeholder{color:#cccccc;}
 ::-webkit-scrollbar{width:0;height:0;}
@@ -22,6 +22,144 @@ input::placeholder,textarea::placeholder{color:#cccccc;}
 @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
 .fade{animation:fd .15s ease;}
 @keyframes fd{from{opacity:0}to{opacity:1}}
+/* ══ iPhone 17 Black ══
+ * 6.3" OLED · A19 · 알루미늄 유니바디 · Ceramic Shield 2
+ */
+
+body{ background:radial-gradient(ellipse at 40% 30%,#2a2a2a 0%,#111 100%); }
+
+/* 폰 외관 — 블랙 알루미늄 */
+.phone-shell{
+  width:414px; height:910px;
+  flex-shrink:0; position:relative;
+  background:linear-gradient(145deg,#2c2c2c 0%,#1a1a1a 35%,#222 55%,#181818 80%,#141414 100%);
+  border-radius:52px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.12),
+    0 0 0 2px rgba(0,0,0,.9),
+    inset 0 1px 0 rgba(255,255,255,.1),
+    inset 0 -1px 0 rgba(0,0,0,.4),
+    0 50px 120px rgba(0,0,0,.8),
+    0 10px 40px rgba(0,0,0,.5);
+  padding:16px 14px;
+  margin:28px 0 28px 28px;
+}
+/* Action 버튼 — 좌측 */
+.phone-shell::before{
+  content:""; position:absolute;
+  left:-5px; top:108px;
+  width:5px; height:34px;
+  border-radius:3px 0 0 3px;
+  background:linear-gradient(180deg,#363636 0%,#242424 50%,#1c1c1c 100%);
+  box-shadow:-2px 0 4px rgba(0,0,0,.6),inset 1px 0 0 rgba(255,255,255,.08);
+}
+/* Camera Control — 우측 (iPhone 17 특징) */
+.phone-shell::after{
+  content:""; position:absolute;
+  right:-5px; top:148px;
+  width:5px; height:80px;
+  border-radius:0 3px 3px 0;
+  background:linear-gradient(180deg,#363636 0%,#242424 50%,#1c1c1c 100%);
+  box-shadow:2px 0 4px rgba(0,0,0,.6),inset -1px 0 0 rgba(255,255,255,.08);
+}
+/* 볼륨 버튼 */
+.vol-btn{
+  position:absolute; left:-5px; top:172px;
+  width:5px; height:36px;
+  border-radius:3px 0 0 3px;
+  background:linear-gradient(180deg,#363636 0%,#242424 50%,#1c1c1c 100%);
+  box-shadow:-2px 0 4px rgba(0,0,0,.6),inset 1px 0 0 rgba(255,255,255,.08);
+}
+.vol-btn2{
+  position:absolute; left:-5px; top:220px;
+  width:5px; height:36px;
+  border-radius:3px 0 0 3px;
+  background:linear-gradient(180deg,#363636 0%,#242424 50%,#1c1c1c 100%);
+  box-shadow:-2px 0 4px rgba(0,0,0,.6),inset 1px 0 0 rgba(255,255,255,.08);
+}
+.mute-btn{ display:none; }
+
+/* 화면 영역 */
+.phone-screen{
+  width:386px; height:878px;
+  border-radius:40px;
+  overflow:hidden;
+  position:relative;
+  background:#111;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
+}
+
+/* Dynamic Island */
+.dynamic-island{
+  position:absolute; top:13px; left:50%; transform:translateX(-50%);
+  width:116px; height:35px;
+  background:#000;
+  border-radius:18px;
+  z-index:500;        /* 앱 콘텐츠 위, 모달(z:600+) 아래 */
+  box-shadow:0 0 0 1px rgba(255,255,255,.04),0 2px 8px rgba(0,0,0,.6);
+}
+.dynamic-island::before{
+  content:""; position:absolute;
+  width:11px; height:11px;
+  background:radial-gradient(circle,#1a2a1a 30%,#090d09 100%);
+  border-radius:50%;
+  top:50%; left:24px; transform:translateY(-50%);
+}
+.dynamic-island::after{
+  content:""; position:absolute;
+  width:7px; height:7px; background:#080808;
+  border-radius:50%;
+  top:50%; right:22px; transform:translateY(-50%);
+}
+
+/* ── 레이어 구조 ──────────────────────────────
+ * phone-screen (position:relative, overflow:hidden)
+ *   ├─ .status-bar-bg   z:300  배경 솔리드 (콘텐츠 안 비침)
+ *   ├─ .status-bar       z:400  시계·아이콘 (pointer-events:none)
+ *   ├─ .dynamic-island   z:500  항상 최상위
+ *   ├─ .app-content      z:10   top:56 ~ bottom:0
+ *   │    ├─ .app-scroll  height:100% - nav
+ *   │    └─ BottomNav    absolute bottom:0
+ *   ├─ Modals/overlays   z:600+ (inset:0 → 전체화면 오버레이)
+ *   ├─ Toast             z:900
+ *   └─ .home-indicator   z:200
+ */
+.status-bar-bg{
+  position:absolute; top:0; left:0; right:0; height:56px;
+  background:#fff;   /* 앱 헤더와 동일 배경 → 완전히 막음 */
+  z-index:300;
+}
+.status-bar{
+  height:56px; width:100%;
+  display:flex; align-items:flex-end; justify-content:space-between;
+  padding:0 30px 9px;
+  position:absolute; top:0; left:0; right:0;
+  z-index:400; pointer-events:none;
+}
+.status-bar-time{
+  font-size:15px; font-weight:800; color:#111;
+  letter-spacing:-0.5px; font-family:-apple-system,sans-serif;
+}
+.status-bar-icons{ display:flex; align-items:center; gap:7px; }
+
+/* 앱 콘텐츠 — 상태바 아래부터 시작 */
+.app-content{
+  position:absolute; top:56px; left:0; right:0; bottom:0;
+  overflow:hidden; z-index:10;
+}
+/* 스크롤 가능 영역 — app-content 기준 */
+.app-scroll{
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+/* Home indicator */
+.home-indicator{
+  position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+  width:130px; height:5px;
+  background:rgba(0,0,0,.18);
+  border-radius:3px; z-index:200; pointer-events:none;
+}
 </style>
 </head>
 <body>
@@ -293,13 +431,13 @@ function Divider({height=8}){
 
 function Toast({msg,onDone}){
   useEffect(()=>{const t=setTimeout(onDone,2000);return()=>clearTimeout(t);},[]);
-  return <div className="fade" style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"rgba(54,54,54,.93)",color:C.white,padding:"11px 22px",borderRadius:50,fontSize:13,fontWeight:600,zIndex:999,whiteSpace:"nowrap",letterSpacing:"-0.3px",boxShadow:"0 4px 20px rgba(0,0,0,.2)"}}>
+  return <div className="fade" style={{position:"absolute",bottom:110,left:"50%",transform:"translateX(-50%)",background:"rgba(54,54,54,.93)",color:C.white,padding:"11px 22px",borderRadius:50,fontSize:13,fontWeight:600,zIndex:999,whiteSpace:"nowrap",letterSpacing:"-0.3px",boxShadow:"0 4px 20px rgba(0,0,0,.2)"}}>
     ✓ {msg}
   </div>;
 }
 
 function Confirm({title,msg,onOk,onCancel,okLabel="확인",okVariant="danger"}){
-  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+  return <div className="fade" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
     <div className="pop" style={{background:C.white,borderRadius:16,padding:24,width:"100%",maxWidth:340}}>
       {title&&<div style={{fontWeight:700,fontSize:16,marginBottom:6,letterSpacing:"-0.5px"}}>{title}</div>}
       <div style={{fontSize:14,color:C.desc,lineHeight:1.6,marginBottom:20,letterSpacing:"-0.2px",whiteSpace:"pre-line"}}>{msg}</div>
@@ -312,7 +450,7 @@ function Confirm({title,msg,onOk,onCancel,okLabel="확인",okVariant="danger"}){
 }
 
 function BottomSheet({title,onClose,children,maxHeight="88vh"}){
-  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+  return <div className="fade" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)",zIndex:600,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
     <div className="slide-up" style={{width:390,background:C.white,borderRadius:"16px 16px 0 0",maxHeight,overflowY:"auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
         <span style={{fontWeight:700,fontSize:16,letterSpacing:"-0.5px"}}>{title}</span>
@@ -452,7 +590,7 @@ function BottomNav({active,onNav}){
       </svg>
     )},
   ];
-  return <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:390,display:"flex",background:C.white,borderTop:`1px solid ${C.line}`,zIndex:100,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+  return <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",background:C.white,borderTop:`1px solid ${C.line}`,zIndex:100,paddingBottom:10}}>
     {tabs.map(t=><button key={t.k} onClick={()=>onNav(t.k)} style={{flex:1,padding:"9px 0 10px",border:"none",background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer"}}>
       {t.icon(active===t.k)}
       <span style={{fontSize:10,fontWeight:active===t.k?700:400,color:active===t.k?C.blue:C.dimmed,letterSpacing:"-0.3px"}}>{t.l}</span>
@@ -471,7 +609,7 @@ function HomeScreen({onScheduleModal,onGoReservation,products,onEmergencyCancel,
   const todaySold=todayProds.reduce((s,p)=>s+p.sold,0);
   const todayCap=todayProds.reduce((s,p)=>s+p.capacity,0);
   const weekSettle=391; // mock
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="홈" dot={true}/>
     <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
 
@@ -557,7 +695,7 @@ function HomeScreen({onScheduleModal,onGoReservation,products,onEmergencyCancel,
       })}
     </div>
 
-    {showCancelConfirm&&<div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+    {showCancelConfirm&&<div className="fade" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
       <div className="pop" style={{background:C.white,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340,position:"relative"}}>
         <button onClick={()=>setShowCancelConfirm(false)} style={{position:"absolute",top:16,right:16,border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         <div style={{fontWeight:800,fontSize:18,color:C.black,textAlign:"center",marginBottom:12,letterSpacing:"-0.5px"}}>출항 취소 처리</div>
@@ -617,7 +755,7 @@ function ScheduleModal({onClose}){
         <button onClick={onClose} style={{padding:"13px",border:"none",borderRadius:10,background:C.blue,fontWeight:700,fontSize:14,cursor:"pointer",color:C.white,letterSpacing:"-0.3px"}}>저장</button>
       </div>
     </div>
-    {showCancelConfirm&&<div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+    {showCancelConfirm&&<div className="fade" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
       <div className="pop" style={{background:C.white,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340,position:"relative"}}>
         <button onClick={()=>setShowCancelConfirm(false)} style={{position:"absolute",top:16,right:16,border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         <div style={{fontWeight:800,fontSize:18,color:C.black,textAlign:"center",marginBottom:12,letterSpacing:"-0.5px"}}>출항 취소 처리</div>
@@ -634,7 +772,7 @@ function ScheduleModal({onClose}){
 function SettlementScreen({onDetail,selectedBoatId,onSelectBoat}){
   const [cy,setCy]=useState(2026);const [cm,setCm]=useState(2);
   const hm=d=>{let m=cm+d,y=cy;if(m>12){m=1;y++;}if(m<1){m=12;y--;}setCm(m);setCy(y);};
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="정산관리"/>
     <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
     <div style={{margin:"0 16px 8px",background:C.white,borderRadius:10,border:`1px solid ${C.line}`,padding:"9px 14px",display:"flex",gap:8,alignItems:"center",justifyContent:"center",fontSize:13,color:C.desc}}>
@@ -668,7 +806,7 @@ function SettlementScreen({onDetail,selectedBoatId,onSelectBoat}){
 }
 
 function SettlementDetailScreen({onBack}){
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="정산 상세내역" onBack={onBack}/>
     <div style={{padding:16}}>
       <div style={{background:"#E6F9F4",borderLeft:`4px solid ${C.green}`,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
@@ -703,7 +841,7 @@ function ReservationScreen({onBack,allRsvs,addManualRsv,products,selectedBoatId,
   const tabs=["전체","예약완료","입금대기","취소완료"];
   const filtered=tab==="전체"?rsvs:rsvs.filter(r=>r.status===tab);
   const handleAdd=rsv=>{addManualRsv&&addManualRsv(rsv);setShowAdd(false);setToast("예약이 추가됐습니다 ✓");};
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="예약관리" onBack={onBack} right={
       <button onClick={()=>setShowAdd(true)} style={{border:"none",background:C.blue,color:C.white,borderRadius:8,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px"}}>+ 직접추가</button>
     }/>
@@ -984,7 +1122,7 @@ function DirectReservationModal({onClose,onSave,products,defaultProductId}){
 
   const pl=PLATFORMS.find(p=>p.key===platform)||PLATFORMS[0];
 
-  return <div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:500,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+  return <div className="fade" style={{position:'absolute',inset:0,background:'rgba(0,0,0,.45)',zIndex:650,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
     <div className="slide-up" style={{width:390,background:C.white,borderRadius:'16px 16px 0 0',maxHeight:'94vh',overflowY:'auto'}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
         <div>
@@ -1187,7 +1325,7 @@ function DailyProductEditModal({product:p, onClose, onSave}){
   const labelSt={fontWeight:600,fontSize:13,marginBottom:6,color:C.black,letterSpacing:"-0.3px"};
   const rowSt={marginBottom:18};
 
-  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+  return <div className="fade" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)",zIndex:650,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
     <div className="slide-up" style={{width:390,background:C.white,borderRadius:"16px 16px 0 0",maxHeight:"88vh",overflowY:"auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
         <div>
@@ -1314,7 +1452,7 @@ function MasterProductModal({master, onClose, onSave}){
   const times=[];for(let h=0;h<24;h++){times.push(`${String(h).padStart(2,"0")}:00`);times.push(`${String(h).padStart(2,"0")}:30`);}
   const mmdd=v=>{const s=String(v).padStart(4,"0");return `${s.slice(0,2)}/${s.slice(2)}`;};
 
-  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+  return <div className="fade" style={{position:"absolute",inset:0,background:"rgba(0,0,0,.45)",zIndex:650,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
     <div className="slide-up" style={{width:390,background:C.white,borderRadius:"16px 16px 0 0",maxHeight:"94vh",overflowY:"auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
         <span style={{fontWeight:700,fontSize:16,letterSpacing:"-0.5px"}}>{isEdit?"출조종류 수정":"출조종류 등록"}</span>
@@ -1696,7 +1834,7 @@ function ProductListScreen({onRegister,products,setProducts,addManualRsv,allRsvs
     });
   };
 
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="상품관리" dot={true}/>
     <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
 
@@ -1766,7 +1904,7 @@ function BulkEditScreen({onBack,products,setProducts}){
     setTimeout(onBack,1600);
   };
   const labelStyle={fontWeight:700,fontSize:14,marginBottom:10,letterSpacing:"-0.5px",color:C.black,paddingBottom:8,borderBottom:`1.5px solid ${C.line}`};
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:80,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="상품 일괄수정" onBack={onBack}/>
     <div style={{padding:16}}>
       <div style={{background:"#FFF8E0",borderRadius:10,border:`1px solid #FFE580`,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#8A6400",lineHeight:1.6,letterSpacing:"-0.2px"}}>
@@ -1838,7 +1976,7 @@ function ProductRegisterScreen({onBack}){
   const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
   const labelStyle={fontSize:12,color:C.desc,fontWeight:600,marginBottom:5,letterSpacing:"-0.2px"};
   const register=()=>{setToast("상품이 등록되었습니다");setTimeout(onBack,1500);};
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:100,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="상품 등록" onBack={onBack}/>
 
     <div style={{margin:"12px 16px 0",display:"grid",gridTemplateColumns:"1fr 1fr",border:`1.5px solid ${C.line2}`,borderRadius:10,overflow:"hidden",background:C.white}}>
@@ -1921,7 +2059,7 @@ function FishingReportScreen({onAdd,selectedBoatId,onSelectBoat}){
   const [reports,setReports]=useState(FISHING_REPORTS);
   const [confirm,setConfirm]=useState(null);
   const del=id=>{setReports(p=>p.filter(x=>x.id!==id));setConfirm(null);};
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:130,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="조황관리"/>
     <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
     <div style={{padding:"0 16px 10px"}}>
@@ -1951,7 +2089,7 @@ function FishingReportScreen({onAdd,selectedBoatId,onSelectBoat}){
         </div>
       </div>)}
     </div>
-    <div style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",width:390,padding:"0 16px",boxSizing:"border-box"}}>
+    <div style={{padding:"0 16px 16px"}}>
       <button onClick={onAdd} style={{width:"100%",padding:"14px",background:C.black,color:C.white,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px",boxShadow:"0 4px 20px rgba(0,0,0,.2)"}}>🐟 조황 등록 +</button>
     </div>
     {confirm&&<Confirm title="조황 삭제" msg={confirm.msg} onOk={confirm.onOk} onCancel={()=>setConfirm(null)}/>}
@@ -1966,7 +2104,7 @@ function FishingModal({onClose}){
   const register=()=>{setToast("조황이 등록되었습니다");setTimeout(onClose,1500);};
   const labelStyle={fontWeight:600,fontSize:13,marginBottom:7,letterSpacing:"-0.3px",color:C.black};
   const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
-  return <div style={{position:"fixed",inset:0,background:C.white,zIndex:300,overflowY:"auto"}}>
+  return <div style={{position:"absolute",inset:0,background:C.white,zIndex:660,overflowY:"auto"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px",height:54,borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
       <span style={{fontWeight:700,fontSize:17,letterSpacing:"-0.5px"}}>조황 등록</span>
       <button onClick={onClose} style={{border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed}}>✕</button>
@@ -2012,7 +2150,7 @@ function NoticeScreen({selectedBoatId,onSelectBoat}){
   const [toast,setToast]=useState("");
   const add=()=>{if(!title.trim())return;setNotices(p=>[{id:Date.now(),title,body,date:"2026.02.28",views:0},...p]);setTitle("");setBody("");setAdding(false);setToast("공지가 등록됐습니다");};
   const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
-  return <div style={{flex:1,overflowY:"auto",paddingBottom:130,background:C.bg2}}>
+  return <div style={{background:C.bg2,paddingBottom:24}}>
     <AppHeader title="공지관리"/>
     <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
     <div style={{padding:"0 16px"}}>
@@ -2046,7 +2184,7 @@ function NoticeScreen({selectedBoatId,onSelectBoat}){
         </div>
       </div>
     </BottomSheet>}
-    <div style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",width:390,padding:"0 16px",boxSizing:"border-box"}}>
+    <div style={{padding:"0 16px 16px"}}>
       <button onClick={()=>setAdding(true)} style={{width:"100%",padding:"14px",background:C.blue,color:C.white,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px"}}>공지 등록하기 +</button>
     </div>
     {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
@@ -2099,7 +2237,7 @@ function FeedbackPanel({screen}){
   const tagColors=["#EBF0FF","#E8FFF3","#FFF8E0","#FFE8E8","#F5E8FF","#E8F8FF","#F0FFE8"];
   const tagTextColors=[accent,"#00875A","#996600","#CC0000","#6600CC","#0077CC","#2D8000"];
 
-  return <div style={{display:"flex",flexDirection:"row",flexShrink:0,position:"sticky",top:0,height:"100vh",alignSelf:"flex-start"}}>
+  return <div style={{display:"flex",flexDirection:"row",flexShrink:0,height:"100vh"}}>
     {/* 토글 버튼 — 패널과 별도 컬럼, 겹침 없음 */}
     <div style={{width:28,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:20,flexShrink:0}}>
       <button onClick={()=>setOpen(o=>!o)} title={open?"의견 패널 닫기":"의견 패널 열기"}
@@ -2261,17 +2399,68 @@ function App(){
   };
   const hideNav=["reservation","settlementDetail"].includes(screen);
 
-  return <div style={{display:"flex",justifyContent:"center",minHeight:"100vh",background:"#d6d6d6",alignItems:"flex-start"}}>
-    {/* 앱 프레임 — willChange:transform으로 position:fixed 자식들을 이 컨테이너 기준으로 고정 */}
-    <div style={{width:390,minHeight:"100vh",background:C.bg2,display:"flex",flexDirection:"column",position:"relative",overflowX:"hidden",willChange:"transform",flexShrink:0}}>
-      {renderScreen()}
-      {!hideNav&&<BottomNav active={nav} onNav={goNav}/>}
-      {showSchedule&&<ScheduleModal onClose={()=>setShowSchedule(false)}/>}
-      {showFishing&&<FishingModal onClose={()=>setShowFishing(false)}/>}
-      {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  return <div style={{display:"flex",justifyContent:"flex-start",alignItems:"flex-start",minHeight:"100vh",background:"#1a1a2e",padding:"0"}}>
+    {/* ── iPhone 17 Black ── */}
+    <div className="phone-shell">
+      <div className="vol-btn"/><div className="vol-btn2"/>
+
+      <div className="phone-screen">
+        {/* Dynamic Island — 항상 최상단(z:500), 모달(z:600+)에 가려짐 */}
+        <div className="dynamic-island"/>
+
+        {/* 상태바 배경 — 콘텐츠 안 비침(z:300) */}
+        <div className="status-bar-bg"/>
+
+        {/* 상태바 아이콘 — 다크 (흰 배경 위, z:400) */}
+        <div className="status-bar">
+          <span className="status-bar-time">9:41</span>
+          <div className="status-bar-icons">
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="#111">
+              <rect x="0" y="7" width="3" height="5" rx="0.8"/>
+              <rect x="4.5" y="5" width="3" height="7" rx="0.8"/>
+              <rect x="9" y="2.5" width="3" height="9.5" rx="0.8"/>
+              <rect x="13.5" y="0" width="3" height="12" rx="0.8" opacity=".3"/>
+            </svg>
+            <svg width="16" height="12" viewBox="0 0 16 12">
+              <circle cx="8" cy="11" r="1.8" fill="#111"/>
+              <path d="M3.8 7a6 6 0 0 1 8.4 0" fill="none" stroke="#111" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M1 4a10 10 0 0 1 14 0" fill="none" stroke="#111" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+              <rect x="0.5" y="0.5" width="22" height="12" rx="3.5" stroke="#111" strokeOpacity=".4" strokeWidth="1"/>
+              <rect x="23" y="4" width="3.5" height="5" rx="1.5" fill="#111" fillOpacity=".35"/>
+              <rect x="2" y="2" width="17" height="9" rx="2" fill="#111"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* 앱 콘텐츠 — top:56px(상태바 아래)부터 z:10 */}
+        <div className="app-content">
+          {/* 스크롤 영역 — BottomNav 높이만큼 bottom 확보 */}
+          <div className="app-scroll" style={{bottom:hideNav?0:80}}>
+            {renderScreen()}
+          </div>
+          {/* 하단 탭바 — app-content 기준 absolute bottom:0 */}
+          {!hideNav&&<BottomNav active={nav} onNav={goNav}/>}
+        </div>
+
+        {/* 모달/오버레이 — phone-screen 기준 inset:0, z:600+
+            상태바·Dynamic Island까지 전체 덮음 */}
+        {showSchedule&&<ScheduleModal onClose={()=>setShowSchedule(false)}/>}
+        {showFishing&&<FishingModal onClose={()=>setShowFishing(false)}/>}
+
+        {/* 토스트 — phone-screen 기준 absolute */}
+        {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+
+        {/* Home Indicator */}
+        <div className="home-indicator"/>
+      </div>
     </div>
+
     {/* 의견 패널 */}
-    <FeedbackPanel screen={screen}/>
+    <div style={{alignSelf:"flex-start",position:"sticky",top:0,height:"100vh"}}>
+      <FeedbackPanel screen={screen}/>
+    </div>
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
