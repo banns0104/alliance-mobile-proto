@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>어바웃피싱 선주앱 (AboutFishing Captain)</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>const _cw=console.warn;console.warn=(...a)=>{if(a[0]&&String(a[0]).includes('Babel'))return;_cw(...a);};</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:#d6d6d6;font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;color:#363636;font-size:14px;line-height:1;}
+button,input,select,textarea{font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;color:#363636;outline:none;-webkit-appearance:none;}
+input::placeholder,textarea::placeholder{color:#cccccc;}
+::-webkit-scrollbar{width:0;height:0;}
+.slide-up{animation:su .24s cubic-bezier(.16,1,.3,1);}
+@keyframes su{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.pop{animation:pop .18s ease;}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.fade{animation:fd .15s ease;}
+@keyframes fd{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+
+/* ═══ TOKENS ═══ */
+const C={
+  blue:"#0041FF",
+  yellow:"#FFC300",
+  black:"#363636",
+  desc:"#767676",
+  dimmed:"#cccccc",
+  line:"#eeeeee",
+  line2:"#e0e0e0",
+  bg1:"#fbfbfb",
+  bg2:"#f8f8f8",
+  bg3:"#f3f3f3",
+  blueBg:"#F5F7FA",
+  white:"#ffffff",
+  red:"#FF3333",
+  green:"#00B07D",
+  orange:"#FF7A00",
+};
+
+/* ═══ MOCK DATA (어바웃피싱 실제 DB 구조 반영) ═══
+ *
+ * 계층: 제휴업체(partner) → 선박(boat) → 마스터상품(boat_product) → 일자별상품(boat_product_item)
+ *
+ * 마스터상품: 운영기간/요일/요금 템플릿. 일자별 자동생성의 기준.
+ * 일자별상품: 마스터에서 날짜별로 생성된 개별 슬롯. 노출/마감/정원 독립 관리.
+ */
+
+/* ── 선박 정보 ── */
+const BOAT_INFO={
+  boatIdx:1, partnerIdx:1,
+  name:"왕감자호",
+  people:20, size:9.77,
+  assemblyAddr:"인천시 중구 항동7가 1-1 연안여객터미널",
+  fishingAddr:"인천 영흥도 앞바다",
+  reserveSellState:2, // 1:수기확정, 2:자동확정
+  productsFee:3,
+};
+
+/* ── 마스터상품 (boat_product) ── */
+let nextMasterId=4;
+const initMasterProducts=[
+  {
+    id:1, boatIdx:1,
+    name:"갑오징어/주꾸미",
+    fishSpecies:["갑오징어","주꾸미"],
+    minPeople:1, maxPeople:11,
+    sReleaseDt:"0101", eReleaseDt:"1231",   // MMDD
+    releaseDate:"T",                          // T:금년, N:내년
+    releaseWeek:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+    sReleaseTime:"05:00", eReleaseTime:"15:30",
+    releaseDay:"T",                           // T:당일, N:익일
+    adultRate:94000, adultWeekendRate:110000,
+    kidsRate:70000, kidsWeekendRate:84000,
+    isWeekendRate:true, isKidsRate:true,
+    seatType:"D",                             // D:추첨, R:지정
+    productsFee:3,
+    isBus:false, busInfo:"",
+    notes:"",
+  },
+  {
+    id:2, boatIdx:1,
+    name:"영흥도 광어/우럭",
+    fishSpecies:["광어","우럭"],
+    minPeople:1, maxPeople:11,
+    sReleaseDt:"0101", eReleaseDt:"1231",
+    releaseDate:"T",
+    releaseWeek:["Fri","Sat","Sun"],
+    sReleaseTime:"05:00", eReleaseTime:"15:30",
+    releaseDay:"T",
+    adultRate:120000, adultWeekendRate:130000,
+    kidsRate:90000, kidsWeekendRate:100000,
+    isWeekendRate:true, isKidsRate:true,
+    seatType:"D",
+    productsFee:3,
+    isBus:false, busInfo:"",
+    notes:"대회 당일 취소 불가",
+  },
+  {
+    id:3, boatIdx:1,
+    name:"야간 쭈꾸미/낙지",
+    fishSpecies:["주꾸미","낙지"],
+    minPeople:2, maxPeople:15,
+    sReleaseDt:"0301", eReleaseDt:"1031",
+    releaseDate:"T",
+    releaseWeek:["Fri","Sat"],
+    sReleaseTime:"20:00", eReleaseTime:"05:00",
+    releaseDay:"N",                           // 익일
+    adultRate:78000, adultWeekendRate:90000,
+    kidsRate:0, kidsWeekendRate:0,
+    isWeekendRate:true, isKidsRate:false,
+    seatType:"D",
+    productsFee:3,
+    isBus:false, busInfo:"",
+    notes:"구명조끼 필수 착용",
+  },
+];
+
+/* ── 일자별상품 (boat_product_item) ──
+ * 필수 Y 필드 전체 포함:
+ * boat_idx, boat_product_idx(masterProductId), bpi_name, bpi_min_people, bpi_max_people,
+ * bpi_s_release_dt(YYMMDD), bpi_e_release_dt(YYMMDD),
+ * bpi_s_release_time, bpi_e_release_time, bpi_release_day,
+ * bpi_is_weekend_rate, bpi_is_kids_rate,
+ * bpi_adult_rate, bpi_adult_weekend_rate, bpi_kids_rate, bpi_kids_weekend_rate,
+ * bpi_products_fee, bpi_qty, bpi_is_display, bpi_is_exception
+ */
+let nextDailyId=8;
+const initDailyProducts=[
+  {id:1, masterProductId:1, boatIdx:1,
+   bpiName:"갑오징어/주꾸미", fishSpecies:["갑오징어","주꾸미"],
+   date:"2026-02-27", bpiSReleaseDt:"260227", bpiEReleaseDt:"260227",
+   bpiMinPeople:1, bpiMaxPeople:11,
+   bpiSReleaseTime:"05:00", bpiEReleaseTime:"15:30", bpiReleaseDay:"T",
+   bpiIsWeekendRate:false, bpiIsKidsRate:true,
+   bpiAdultRate:94000, bpiAdultWeekendRate:110000, bpiKidsRate:70000, bpiKidsWeekendRate:84000,
+   bpiProductsFee:3, bpiQty:11, sold:5,
+   bpiIsDisplay:true, bpiIsException:false},
+  {id:2, masterProductId:2, boatIdx:1,
+   bpiName:"영흥도 광어/우럭", fishSpecies:["광어","우럭"],
+   date:"2026-02-27", bpiSReleaseDt:"260227", bpiEReleaseDt:"260227",
+   bpiMinPeople:1, bpiMaxPeople:11,
+   bpiSReleaseTime:"05:00", bpiEReleaseTime:"15:30", bpiReleaseDay:"T",
+   bpiIsWeekendRate:false, bpiIsKidsRate:true,
+   bpiAdultRate:120000, bpiAdultWeekendRate:130000, bpiKidsRate:90000, bpiKidsWeekendRate:100000,
+   bpiProductsFee:3, bpiQty:11, sold:3,
+   bpiIsDisplay:true, bpiIsException:false},
+  {id:3, masterProductId:1, boatIdx:1,
+   bpiName:"우럭/광어 다운샷", fishSpecies:["우럭","광어"],
+   date:"2026-02-27", bpiSReleaseDt:"260227", bpiEReleaseDt:"260227",
+   bpiMinPeople:1, bpiMaxPeople:11,
+   bpiSReleaseTime:"05:00", bpiEReleaseTime:"15:30", bpiReleaseDay:"T",
+   bpiIsWeekendRate:false, bpiIsKidsRate:true,
+   bpiAdultRate:94000, bpiAdultWeekendRate:110000, bpiKidsRate:70000, bpiKidsWeekendRate:84000,
+   bpiProductsFee:3, bpiQty:11, sold:2,
+   bpiIsDisplay:true, bpiIsException:false},
+  {id:4, masterProductId:1, boatIdx:1,
+   bpiName:"갑오징어/주꾸미", fishSpecies:["갑오징어","주꾸미"],
+   date:"2026-02-28", bpiSReleaseDt:"260228", bpiEReleaseDt:"260228",
+   bpiMinPeople:1, bpiMaxPeople:11,
+   bpiSReleaseTime:"05:00", bpiEReleaseTime:"15:30", bpiReleaseDay:"T",
+   bpiIsWeekendRate:true, bpiIsKidsRate:true,     // 주말요금 적용
+   bpiAdultRate:94000, bpiAdultWeekendRate:110000, bpiKidsRate:70000, bpiKidsWeekendRate:84000,
+   bpiProductsFee:3, bpiQty:11, sold:1,
+   bpiIsDisplay:true, bpiIsException:false},
+  {id:5, masterProductId:1, boatIdx:1,
+   bpiName:"우럭/광어 다운샷", fishSpecies:["우럭","광어"],
+   date:"2026-02-28", bpiSReleaseDt:"260228", bpiEReleaseDt:"260228",
+   bpiMinPeople:1, bpiMaxPeople:11,
+   bpiSReleaseTime:"05:00", bpiEReleaseTime:"15:30", bpiReleaseDay:"T",
+   bpiIsWeekendRate:true, bpiIsKidsRate:true,
+   bpiAdultRate:94000, bpiAdultWeekendRate:110000, bpiKidsRate:70000, bpiKidsWeekendRate:84000,
+   bpiProductsFee:3, bpiQty:11, sold:4,
+   bpiIsDisplay:true, bpiIsException:false},
+  {id:6, masterProductId:3, boatIdx:1,
+   bpiName:"야간 쭈꾸미/낙지", fishSpecies:["주꾸미","낙지"],
+   date:"2026-02-28", bpiSReleaseDt:"260228", bpiEReleaseDt:"260301",  // 익일
+   bpiMinPeople:2, bpiMaxPeople:15,
+   bpiSReleaseTime:"20:00", bpiEReleaseTime:"05:00", bpiReleaseDay:"N",
+   bpiIsWeekendRate:true, bpiIsKidsRate:false,
+   bpiAdultRate:78000, bpiAdultWeekendRate:90000, bpiKidsRate:0, bpiKidsWeekendRate:0,
+   bpiProductsFee:3, bpiQty:15, sold:9,
+   bpiIsDisplay:true, bpiIsException:false},
+  {id:7, masterProductId:2, boatIdx:1,
+   bpiName:"영흥도 광어/우럭", fishSpecies:["광어","우럭"],
+   date:"2026-03-07", bpiSReleaseDt:"260307", bpiEReleaseDt:"260307",
+   bpiMinPeople:1, bpiMaxPeople:11,
+   bpiSReleaseTime:"05:00", bpiEReleaseTime:"15:30", bpiReleaseDay:"T",
+   bpiIsWeekendRate:true, bpiIsKidsRate:true,
+   bpiAdultRate:120000, bpiAdultWeekendRate:130000, bpiKidsRate:90000, bpiKidsWeekendRate:100000,
+   bpiProductsFee:3, bpiQty:11, sold:0,
+   bpiIsDisplay:false, bpiIsException:false},
+];
+
+/* ── 기존 코드 호환용 alias (홈/예약 화면) ── */
+const initProducts=initDailyProducts.map(d=>({
+  id:d.id, name:d.bpiName, price:d.bpiAdultRate,
+  capacity:d.bpiQty, sold:d.sold,
+  status:d.bpiIsDisplay?"selling":"stop",
+  date:d.date, depart:d.bpiSReleaseTime, arrive:d.bpiEReleaseTime,
+  type:d.bpiReleaseDay==="T"?"당일":"야간",
+  fish:d.fishSpecies, minBuy:1, memo:"",
+}));
+
+const RESERVATIONS=[
+  {id:"20260228-000014",prodId:2,name:"ㅈㄹ",date:"2026-02-23 11:30",phone:"010-1234-0101",adults:1,kids:0,method:"간편결제(네이버)",amount:120000,status:"예약완료"},
+  {id:"20260224-000001",prodId:1,name:"김채린",date:"",phone:"010-5678-1234",adults:1,kids:0,method:"직접입금",amount:94000,status:"취소완료"},
+  {id:"20260223-000002",prodId:1,name:"서현일테스트",date:"2026-02-20 17:04",phone:"010-9999-0001",adults:2,kids:0,method:"신용카드",amount:188000,status:"이용완료"},
+  {id:"20260221-000011",prodId:3,name:"서현일",date:"2026-02-20 16:28",phone:"010-1111-2222",adults:1,kids:1,method:"신용카드",amount:94000,status:"이용완료"},
+  {id:"20260228-000021",prodId:5,name:"박지수",date:"2026-02-25 09:10",phone:"010-3344-5566",adults:3,kids:0,method:"신용카드",amount:282000,status:"예약완료"},
+  {id:"20260228-000022",prodId:6,name:"최민준",date:"2026-02-25 10:22",phone:"010-7788-9900",adults:2,kids:0,method:"간편결제(카카오)",amount:180000,status:"입금대기"},
+];
+const SETTLEMENTS=[
+  {date:"2026.02.03",total:1,fee:0,amount:100,maxPay:100},
+  {date:"2026.02.05",total:1,fee:-3,amount:100,maxPay:97},
+  {date:"2026.02.24",total:1,fee:-3,amount:100,maxPay:97},
+  {date:"2026.02.26",total:1,fee:-3,amount:100,maxPay:97},
+];
+const FISH_TAGS=["갑오징어","고등어","광어","낙지","노래미","농어","대구","도다리","문어","민어","방어","백조기","부시리","붕어","뿔락","삼치","숭어","열기","오징어","우럭","주꾸미","참돔","한치"];
+const FISHING_REPORTS=[
+  {id:1,title:"2월 4주차 갑오징어 대박!",fish:["갑오징어","주꾸미"],date:"2026년 02월 20일(금)",views:32,img:"🦑"},
+  {id:2,title:"12312312",fish:["갈치","감성돔","갑오징어"],date:"2025년 11월 27일(목)",views:5,img:"🐟"},
+  {id:3,title:"광어 조황",fish:["광어"],date:"2025년 12월 18일(목)",views:12,img:"🐡"},
+];
+const WEEK_KO={"Mon":"월","Tue":"화","Wed":"수","Thu":"목","Fri":"금","Sat":"토","Sun":"일"};
+const DAY_KO=["일","월","화","수","목","금","토"];
+const fmtDate=d=>{const dt=new Date(d);return `${d.replace(/-/g,".")} (${DAY_KO[dt.getDay()]})`;};
+const addDays=(d,n)=>{const dt=new Date(d);dt.setDate(dt.getDate()+n);return dt.toISOString().slice(0,10);};
+
+/* ═══ COMMON COMPONENTS ═══ */
+
+function StatusBadge({status}){
+  const m={
+    "판매중":{bg:"#EBF0FF",c:C.blue},
+    "selling":{bg:"#EBF0FF",c:C.blue},
+    "판매중지":{bg:C.bg3,c:C.desc},
+    "stop":{bg:C.bg3,c:C.desc},
+    "마감":{bg:"#FFF0F0",c:C.red},
+    "예약완료":{bg:"#EBF0FF",c:C.blue},
+    "이용완료":{bg:"#E6F9F4",c:C.green},
+    "취소완료":{bg:"#FFF0F0",c:C.red},
+    "입금대기":{bg:"#FFF8E0",c:"#B07D00"},
+    "예약대기":{bg:"#FFF3E8",c:C.orange},
+  };
+  const s=m[status]||{bg:C.bg3,c:C.desc};
+  const txt=status==="selling"?"판매중":status==="stop"?"판매중지":status;
+  return <span style={{background:s.bg,color:s.c,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:4,whiteSpace:"nowrap",letterSpacing:"-0.2px"}}>{txt}</span>;
+}
+
+function Toggle({value,onChange,size="md"}){
+  const w=size==="sm"?38:44, h=size==="sm"?22:26, dot=size==="sm"?16:20;
+  return <div
+    onClick={e=>{e.stopPropagation();onChange(!value);}}
+    style={{width:w,height:h,borderRadius:h/2,background:value?C.blue:C.dimmed,position:"relative",cursor:"pointer",transition:"background .2s",flexShrink:0}}
+  >
+    <div style={{width:dot,height:dot,borderRadius:dot/2,background:C.white,position:"absolute",top:(h-dot)/2,left:value?w-dot-(h-dot)/2:(h-dot)/2,transition:"left .18s",boxShadow:"0 1px 4px rgba(0,0,0,.18)"}}/>
+  </div>;
+}
+
+function Btn({label,onClick,variant="primary",style:st,full,size="md",icon}){
+  const variants={
+    primary:{bg:C.blue,c:C.white,border:"none"},
+    outline:{bg:C.white,c:C.blue,border:`1.5px solid ${C.blue}`},
+    ghost:{bg:"transparent",c:C.blue,border:"none"},
+    light:{bg:C.bg3,c:C.black,border:"none"},
+    danger:{bg:C.red,c:C.white,border:"none"},
+    dangerOut:{bg:C.white,c:C.red,border:`1.5px solid ${C.red}`},
+    dark:{bg:C.black,c:C.white,border:"none"},
+    yellow:{bg:C.yellow,c:C.black,border:"none"},
+    line:{bg:C.white,c:C.desc,border:`1.5px solid ${C.line2}`},
+  };
+  const sizes={sm:{padding:"6px 12px",fontSize:12,borderRadius:6},md:{padding:"11px 16px",fontSize:14,borderRadius:8},lg:{padding:"14px 20px",fontSize:15,borderRadius:10}};
+  const v=variants[variant]||variants.primary;
+  const sz=sizes[size]||sizes.md;
+  return <button onClick={onClick} style={{fontWeight:600,cursor:"pointer",width:full?"100%":undefined,background:v.bg,color:v.c,border:v.border,letterSpacing:"-0.3px",display:"flex",alignItems:"center",justifyContent:"center",gap:4,...sz,...st}}>
+    {icon&&<span style={{fontSize:sz.fontSize+2}}>{icon}</span>}{label}
+  </button>;
+}
+
+function Divider({height=8}){
+  return <div style={{height,background:C.bg3,flexShrink:0}}/>;
+}
+
+function Toast({msg,onDone}){
+  useEffect(()=>{const t=setTimeout(onDone,2000);return()=>clearTimeout(t);},[]);
+  return <div className="fade" style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"rgba(54,54,54,.93)",color:C.white,padding:"11px 22px",borderRadius:50,fontSize:13,fontWeight:600,zIndex:999,whiteSpace:"nowrap",letterSpacing:"-0.3px",boxShadow:"0 4px 20px rgba(0,0,0,.2)"}}>
+    ✓ {msg}
+  </div>;
+}
+
+function Confirm({title,msg,onOk,onCancel,okLabel="확인",okVariant="danger"}){
+  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+    <div className="pop" style={{background:C.white,borderRadius:16,padding:24,width:"100%",maxWidth:340}}>
+      {title&&<div style={{fontWeight:700,fontSize:16,marginBottom:6,letterSpacing:"-0.5px"}}>{title}</div>}
+      <div style={{fontSize:14,color:C.desc,lineHeight:1.6,marginBottom:20,letterSpacing:"-0.2px",whiteSpace:"pre-line"}}>{msg}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <Btn label="취소" onClick={onCancel} variant="light"/>
+        <Btn label={okLabel} onClick={onOk} variant={okVariant}/>
+      </div>
+    </div>
+  </div>;
+}
+
+function BottomSheet({title,onClose,children,maxHeight="88vh"}){
+  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+    <div className="slide-up" style={{width:390,background:C.white,borderRadius:"16px 16px 0 0",maxHeight,overflowY:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
+        <span style={{fontWeight:700,fontSize:16,letterSpacing:"-0.5px"}}>{title}</span>
+        <button onClick={onClose} style={{border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,padding:0}}>✕</button>
+      </div>
+      {children}
+    </div>
+  </div>;
+}
+
+/* ═══ MINI CALENDAR ═══ */
+function MiniCalendar({year,month,onMonth,dotDates=[],selectedDate,onSelect}){
+  const firstDay=new Date(year,month-1,1).getDay();
+  const daysInMonth=new Date(year,month,0).getDate();
+  const weeks=[];let d=1-firstDay;
+  while(d<=daysInMonth){const w=[];for(let i=0;i<7;i++,d++)w.push(d>=1&&d<=daysInMonth?d:null);weeks.push(w);}
+  const isSel=d2=>{if(!selectedDate||!d2)return false;const s=new Date(selectedDate);return s.getDate()===d2&&s.getMonth()+1===month&&s.getFullYear()===year;};
+  const getDot=d2=>{if(!d2)return null;const k=`${year}-${String(month).padStart(2,"0")}-${String(d2).padStart(2,"0")}`;return dotDates.find(x=>x.date===k);};
+  return <div style={{background:C.white,padding:"0 16px 14px"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 10px"}}>
+      <button onClick={()=>onMonth(-1)} style={{border:"none",background:"transparent",width:34,height:34,borderRadius:17,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.desc,fontSize:18,fontWeight:700}}>‹</button>
+      <span style={{fontWeight:700,fontSize:15,letterSpacing:"-0.5px",color:C.black}}>{year}년 {month}월</span>
+      <button onClick={()=>onMonth(1)} style={{border:"none",background:"transparent",width:34,height:34,borderRadius:17,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.desc,fontSize:18,fontWeight:700}}>›</button>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",textAlign:"center"}}>
+      {["일","월","화","수","목","금","토"].map((d2,i)=><div key={d2} style={{fontSize:11,fontWeight:600,color:i===0?C.red:i===6?C.blue:C.dimmed,padding:"2px 0 7px",letterSpacing:"-0.2px"}}>{d2}</div>)}
+      {weeks.map((w,wi)=>w.map((d2,di)=>{
+        const dot=getDot(d2);const sel=isSel(d2);
+        const isToday=d2===27&&month===2&&year===2026;
+        return <div key={`${wi}-${di}`} onClick={()=>d2&&onSelect&&onSelect(`${year}-${String(month).padStart(2,"0")}-${String(d2).padStart(2,"0")}`)} style={{padding:"2px 0",cursor:d2?"pointer":"default"}}>
+          {d2&&<>
+            <div style={{width:30,height:30,borderRadius:15,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",background:sel?C.blue:isToday?C.blueBg:"transparent",color:sel?C.white:di===0?C.red:di===6?C.blue:C.black,fontSize:13,fontWeight:sel?700:isToday?600:400}}>{d2}</div>
+            {dot&&<div style={{height:4,display:"flex",alignItems:"center",justifyContent:"center",gap:2,marginTop:1}}>
+              <div style={{width:4,height:4,borderRadius:2,background:sel?C.white:C.blue}}/>
+            </div>}
+            {dot&&!sel&&<div style={{fontSize:9,color:C.blue,textAlign:"center",lineHeight:1,fontWeight:600,marginTop:-1}}>{dot.label}</div>}
+          </>}
+        </div>;
+      }))}
+    </div>
+  </div>;
+}
+
+/* ═══ HEADER / NAV ═══ */
+function AppHeader({title,onBack,right,bg=C.white,border=true,dot=false}){
+  return <div style={{padding:"0 16px",height:54,background:bg,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:border?`1px solid ${C.line}`:"none",position:"sticky",top:0,zIndex:50,flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:4}}>
+      {onBack&&<button onClick={onBack} style={{border:"none",background:"transparent",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,cursor:"pointer",color:C.black,fontSize:20,marginLeft:-6}}>←</button>}
+      <span style={{fontWeight:onBack?700:800,fontSize:onBack?17:22,color:C.black,letterSpacing:"-0.6px"}}>{title}{dot&&<span style={{color:C.blue}}>.</span>}</span>
+    </div>
+    {right||(!onBack&&<div style={{display:"flex",gap:2,alignItems:"center"}}>
+      <button style={{border:"none",background:"transparent",width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:8}}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.desc} strokeWidth="2" strokeLinecap="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+      </button>
+      <button style={{border:"none",background:"transparent",width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:8,position:"relative"}}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.desc} strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div style={{position:"absolute",top:8,right:8,width:6,height:6,borderRadius:3,background:C.red}}/>
+      </button>
+      <div style={{width:30,height:30,borderRadius:15,background:C.blue,display:"flex",alignItems:"center",justifyContent:"center",color:C.white,fontSize:12,fontWeight:700,cursor:"pointer",marginLeft:2}}>사</div>
+    </div>)}
+  </div>;
+}
+
+/* ── 선박 목록 (실제로는 API에서 받아옴) ── */
+const BOATS=[
+  {id:1,name:"왕감자호",people:20,size:9.77},
+  {id:2,name:"어바웃피싱호",people:15,size:7.5},
+  {id:3,name:"황금낚시호",people:25,size:12.0},
+];
+
+function BoatSelector({selectedBoatId, onSelect}){
+  const [open,setOpen]=useState(false);
+  const boat=BOATS.find(b=>b.id===(selectedBoatId||1))||BOATS[0];
+  return <div style={{margin:"8px 16px 10px",position:"relative",zIndex:200}}>
+    <div onClick={()=>setOpen(o=>!o)} style={{background:C.white,borderRadius:10,border:`1.5px solid ${open?C.blue:C.line2}`,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontWeight:700,fontSize:15,letterSpacing:"-0.3px",color:C.black}}>{boat.name}</span>
+        <span style={{fontSize:11,color:C.dimmed,letterSpacing:"-0.2px"}}>{boat.people}인승 · {boat.size}t</span>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={open?C.blue:C.desc} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        {open?<polyline points="18 15 12 9 6 15"/>:<polyline points="6 9 12 15 18 9"/>}
+      </svg>
+    </div>
+    {open&&<div className="slide-up" style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:C.white,borderRadius:10,border:`1.5px solid ${C.line2}`,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,.12)"}}>
+      {BOATS.map((b,i)=><div key={b.id} onClick={()=>{onSelect&&onSelect(b.id);setOpen(false);}} style={{padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:i<BOATS.length-1?`1px solid ${C.line}`:"none",background:b.id===boat.id?C.bg3:C.white,cursor:"pointer"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontWeight:b.id===boat.id?700:500,fontSize:14,color:b.id===boat.id?C.blue:C.black,letterSpacing:"-0.3px"}}>{b.name}</span>
+          <span style={{fontSize:11,color:C.dimmed}}>{b.people}인승 · {b.size}t</span>
+        </div>
+        {b.id===boat.id&&<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+      </div>)}
+    </div>}
+  </div>;
+}
+
+function BottomNav({active,onNav}){
+  const tabs=[
+    {k:"home",l:"홈",icon:(a)=>(
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.blue:C.dimmed} strokeWidth={a?2.2:1.8} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v4"/>
+        <path d="M8 11H4a1 1 0 0 0-1 1v2h4"/>
+        <path d="M16 11h4a1 1 0 0 1 1 1v2h-4"/>
+        <path d="M7 14v5h10v-5"/>
+        <path d="M3 14h18"/>
+      </svg>
+    )},
+    {k:"settlement",l:"정산관리",icon:(a)=>(
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.blue:C.dimmed} strokeWidth={a?2.2:1.8} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2"/>
+        <line x1="9" y1="7" x2="15" y2="7"/>
+        <line x1="9" y1="11" x2="15" y2="11"/>
+        <line x1="9" y1="15" x2="12" y2="15"/>
+      </svg>
+    )},
+    {k:"product",l:"상품관리",icon:(a)=>(
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.blue:C.dimmed} strokeWidth={a?2.2:1.8} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="8" height="8" rx="1"/>
+        <rect x="13" y="3" width="8" height="8" rx="1"/>
+        <rect x="3" y="13" width="8" height="8" rx="1"/>
+        <rect x="13" y="13" width="8" height="8" rx="1"/>
+      </svg>
+    )},
+    {k:"fishing",l:"조황관리",icon:(a)=>(
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.blue:C.dimmed} strokeWidth={a?2.2:1.8} strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="2" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+        <rect x="6" y="6" width="12" height="12" rx="1"/>
+      </svg>
+    )},
+    {k:"notice",l:"공지관리",icon:(a)=>(
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.blue:C.dimmed} strokeWidth={a?2.2:1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+        <rect x="9" y="3" width="6" height="4" rx="1"/>
+        <line x1="9" y1="12" x2="15" y2="12"/>
+        <line x1="9" y1="16" x2="12" y2="16"/>
+      </svg>
+    )},
+  ];
+  return <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:390,display:"flex",background:C.white,borderTop:`1px solid ${C.line}`,zIndex:100,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+    {tabs.map(t=><button key={t.k} onClick={()=>onNav(t.k)} style={{flex:1,padding:"9px 0 10px",border:"none",background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer"}}>
+      {t.icon(active===t.k)}
+      <span style={{fontSize:10,fontWeight:active===t.k?700:400,color:active===t.k?C.blue:C.dimmed,letterSpacing:"-0.3px"}}>{t.l}</span>
+    </button>)}
+  </div>;
+}
+
+/* ═══ HOME ═══ */
+function HomeScreen({onScheduleModal,onGoReservation,products,onEmergencyCancel,allRsvs,selectedBoatId,onSelectBoat}){
+  const [cy,setCy]=useState(2026);const [cm,setCm]=useState(2);
+  const [sel,setSel]=useState("2026-02-27");
+  const [showCancelConfirm,setShowCancelConfirm]=useState(false);
+  const dotDates=[{date:"2026-02-21",label:"1건"},{date:"2026-02-23",label:"1건"},{date:"2026-02-27",label:"3건"},{date:"2026-02-28",label:"2건"}];
+  const hm=d=>{let m=cm+d,y=cy;if(m>12){m=1;y++;}if(m<1){m=12;y--;}setCm(m);setCy(y);};
+  const todayProds=products.filter(p=>p.date==="2026-02-27"&&p.status==="selling");
+  const todaySold=todayProds.reduce((s,p)=>s+p.sold,0);
+  const todayCap=todayProds.reduce((s,p)=>s+p.capacity,0);
+  const weekSettle=391; // mock
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+    <AppHeader title="홈" dot={true}/>
+    <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
+
+    {/* 이번 주 예상 정산 - white card */}
+    <div style={{margin:"0 16px 10px",background:C.white,borderRadius:14,border:`1px solid ${C.line}`,padding:"16px 18px"}}>
+      <div style={{fontSize:12,color:C.desc,marginBottom:4,letterSpacing:"-0.2px"}}>이번 주 예상 정산</div>
+      <div style={{fontSize:28,fontWeight:800,color:C.blue,letterSpacing:"-1px",marginBottom:14}}>354,391원</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:0,borderTop:`1px solid ${C.line}`,paddingTop:12}}>
+        {[["오늘 예약",`${todaySold}명`,C.black],["빈자리",`${todayCap-todaySold}석`,C.black],["확정 대기","3건",C.yellow]].map(([l,v,c],i)=><div key={l} style={{textAlign:"center",borderRight:i<2?`1px solid ${C.line}`:"none"}}>
+          <div style={{fontSize:11,color:C.desc,marginBottom:3,letterSpacing:"-0.2px"}}>{l}</div>
+          <div style={{fontWeight:800,fontSize:16,color:c,letterSpacing:"-0.3px"}}>{v}</div>
+        </div>)}
+      </div>
+    </div>
+
+    {/* 긴급 출항취소 - red */}
+    <div style={{margin:"0 16px 10px",background:"#FFF5F5",borderRadius:10,border:`1px solid #FFCCCC`,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+      <div>
+        <div style={{fontWeight:700,fontSize:13,color:C.red,marginBottom:2,letterSpacing:"-0.3px"}}>⚠ 긴급 출항취소</div>
+        <div style={{fontSize:11,color:"#CC4444",lineHeight:1.5}}>기상 악화·선박 결함 시 전체 예약자에게<br/>취소 알림을 즉시 발송합니다.</div>
+      </div>
+      <button onClick={()=>setShowCancelConfirm(true)} style={{flexShrink:0,background:C.red,border:"none",borderRadius:8,padding:"9px 14px",fontWeight:700,fontSize:12,cursor:"pointer",color:C.white,letterSpacing:"-0.3px"}}>
+        출항 취소
+      </button>
+    </div>
+
+    {/* 오늘 빠른현황 */}
+    <div style={{margin:"0 16px 10px"}}>
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:2}}>
+        {todayProds.map(p=>{
+          const rem=p.capacity-p.sold;const pct=Math.round(p.sold/p.capacity*100);
+          return <div key={p.id} style={{flexShrink:0,minWidth:110,background:C.white,borderRadius:10,border:`1px solid ${C.line}`,padding:"11px 12px"}}>
+            <div style={{fontWeight:700,fontSize:12,color:C.black,marginBottom:5,lineHeight:1.3,letterSpacing:"-0.3px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:100}}>{p.name}</div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
+              <span style={{color:C.blue,fontWeight:800,letterSpacing:"-0.3px"}}>{p.sold}/{p.capacity}명</span>
+              <span style={{color:rem===0?C.red:C.desc,letterSpacing:"-0.2px"}}>{p.sold}/{p.capacity}석</span>
+            </div>
+            <div style={{height:3,borderRadius:2,background:C.bg3,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:2,background:pct>=100?C.red:pct>=70?C.orange:C.blue,width:`${Math.min(pct,100)}%`}}/>
+            </div>
+          </div>;
+        })}
+      </div>
+    </div>
+
+    <div style={{background:C.white,borderBottom:`8px solid ${C.bg3}`}}>
+      <MiniCalendar year={cy} month={cm} onMonth={hm} dotDates={dotDates} selectedDate={sel} onSelect={setSel}/>
+    </div>
+
+    <div style={{padding:"14px 16px 0"}}>
+      <div style={{fontWeight:700,fontSize:15,marginBottom:10,letterSpacing:"-0.5px",color:C.black}}>2026년 02월 27일 (금요일)</div>
+      {todayProds.length===0&&<div style={{padding:"30px 0",textAlign:"center",color:C.dimmed,fontSize:13}}>오늘 출항 상품이 없습니다.</div>}
+      {todayProds.map((p,i)=>{
+        const confCnt=(allRsvs||[]).filter(r=>r.prodId===p.id&&r.status==="예약완료").length;
+        const pendCnt=(allRsvs||[]).filter(r=>r.prodId===p.id&&r.status==="입금대기").length;
+        const rem=p.capacity-p.sold;
+        const settle=p.sold*p.price*0.97;
+        return <div key={p.id} style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,overflow:"hidden",marginBottom:10}}>
+          <div style={{padding:"14px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15,color:C.black,letterSpacing:"-0.5px"}}>{p.name}</div>
+                <div style={{fontSize:12,color:C.desc,marginTop:3}}>⏰ {p.depart} 출항 · {p.arrive} 입항</div>
+              </div>
+              <button onClick={onScheduleModal} style={{border:`1.5px solid ${C.line2}`,borderRadius:7,padding:"5px 11px",fontSize:12,fontWeight:600,color:C.black,background:C.white,cursor:"pointer",flexShrink:0,marginLeft:8,letterSpacing:"-0.2px"}}>일정관리</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
+              {[["예약확정",`${confCnt}건`,C.blue,"#EBF0FF"],["입금대기",`${pendCnt}건`,"#B07D00","#FFF8E0"],["취소요청","0건",C.desc,C.bg3]].map(([l,v,c,bg])=><div key={l} style={{background:bg,borderRadius:8,padding:"8px 10px"}}>
+                <div style={{fontSize:10,fontWeight:600,color:c,letterSpacing:"-0.2px"}}>{l}</div>
+                <div style={{fontWeight:800,fontSize:15,color:c,marginTop:2,letterSpacing:"-0.3px"}}>{v}</div>
+              </div>)}
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12}}>
+              <span style={{color:C.desc}}>예약 <span style={{fontWeight:700,color:rem===0?C.red:C.blue}}>{p.sold}/{p.capacity}석</span></span>
+              <span style={{color:C.desc}}>예상 정산금액 <span style={{fontWeight:700,color:C.green}}>{Math.round(settle).toLocaleString()}원</span></span>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderTop:`1px solid ${C.line}`}}>
+            <button onClick={onScheduleModal} style={{padding:"13px",border:"none",background:C.bg1,fontWeight:600,fontSize:13,color:C.black,cursor:"pointer",letterSpacing:"-0.3px",borderRight:`1px solid ${C.line}`}}>일정상세</button>
+            <button onClick={onGoReservation} style={{padding:"13px",border:"none",background:C.blue,fontWeight:700,fontSize:13,color:C.white,cursor:"pointer",letterSpacing:"-0.3px"}}>예약관리</button>
+          </div>
+        </div>;
+      })}
+    </div>
+
+    {showCancelConfirm&&<div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+      <div className="pop" style={{background:C.white,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340,position:"relative"}}>
+        <button onClick={()=>setShowCancelConfirm(false)} style={{position:"absolute",top:16,right:16,border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        <div style={{fontWeight:800,fontSize:18,color:C.black,textAlign:"center",marginBottom:12,letterSpacing:"-0.5px"}}>출항 취소 처리</div>
+        <div style={{fontSize:14,color:C.desc,textAlign:"center",marginBottom:10,lineHeight:1.6,letterSpacing:"-0.2px"}}>오늘(2026.02.27) 출항을<br/>취소하시겠습니까?</div>
+        <div style={{fontSize:12,color:C.red,textAlign:"center",fontWeight:600,marginBottom:24,lineHeight:1.6,letterSpacing:"-0.2px"}}>※ 예약 고객 6명에게 취소 알림과<br/>환불 안내가 즉시 발송됩니다.</div>
+        <button onClick={()=>{setShowCancelConfirm(false);onEmergencyCancel&&onEmergencyCancel();}} style={{width:"100%",padding:"15px",background:C.red,color:C.white,border:"none",borderRadius:50,fontWeight:700,fontSize:15,cursor:"pointer",letterSpacing:"-0.3px",marginBottom:12}}>출항 취소</button>
+        <button onClick={()=>setShowCancelConfirm(false)} style={{width:"100%",padding:"10px",background:"transparent",color:C.desc,border:"none",fontWeight:600,fontSize:14,cursor:"pointer",letterSpacing:"-0.2px"}}>취소</button>
+      </div>
+    </div>}
+  </div>;
+}
+
+/* ═══ SCHEDULE MODAL ═══ */
+function ScheduleModal({onClose}){
+  const [seats,setSeats]=useState(3);
+  const [showCancelConfirm,setShowCancelConfirm]=useState(false);
+  const inputSt={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"11px 14px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
+  const readonlySt={width:"100%",border:`1px solid ${C.line}`,borderRadius:8,padding:"11px 14px",fontSize:14,background:C.bg1,color:C.desc,letterSpacing:"-0.2px"};
+  const labelSt={fontSize:12,fontWeight:600,color:C.desc,marginBottom:6,letterSpacing:"-0.2px"};
+  return <BottomSheet title="일정관리" onClose={onClose}>
+    <div style={{padding:"16px 20px 32px"}}>
+      <div style={{marginBottom:14}}>
+        <div style={labelSt}>선박/낚시터</div>
+        <input defaultValue="왕감자호" style={inputSt}/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={labelSt}>낚시명</div>
+        <input defaultValue="갑오징어/주꾸미" style={inputSt}/>
+      </div>
+      <div style={{marginBottom:16}}>
+        <div style={labelSt}>남은자리 조정</div>
+        <div style={{display:"flex",alignItems:"center",gap:0,border:`1.5px solid ${C.line2}`,borderRadius:10,overflow:"hidden"}}>
+          <button onClick={()=>setSeats(s=>Math.max(0,s-1))} style={{width:52,height:50,border:"none",background:C.bg3,fontSize:22,cursor:"pointer",fontWeight:700,color:C.desc,flexShrink:0}}>−</button>
+          <span style={{flex:1,textAlign:"center",fontSize:22,fontWeight:800,color:C.black,letterSpacing:"-0.5px"}}>{seats}</span>
+          <button onClick={()=>setSeats(s=>s+1)} style={{width:52,height:50,border:"none",background:C.bg3,fontSize:22,cursor:"pointer",fontWeight:700,color:C.desc,flexShrink:0}}>+</button>
+        </div>
+      </div>
+      <div style={{marginBottom:10}}>
+        <div style={labelSt}>출조일자</div>
+        <div style={readonlySt}>26년 02월 27일 (금)</div>
+      </div>
+      <div style={{marginBottom:16}}>
+        <div style={labelSt}>출조시간</div>
+        <div style={readonlySt}>05:00 ~ 15:30</div>
+      </div>
+      <div style={{background:"#FFF5F5",border:`1px solid #FFCCCC`,borderRadius:10,padding:"13px 14px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:3,letterSpacing:"-0.3px"}}>⚠ 긴급 출항취소</div>
+            <div style={{fontSize:11,color:"#CC4444",lineHeight:1.5,letterSpacing:"-0.2px"}}>기상 악화·선박 결함 시 전체 예약자에게<br/>취소 알림을 즉시 발송합니다.</div>
+          </div>
+          <button onClick={()=>setShowCancelConfirm(true)} style={{flexShrink:0,marginLeft:12,background:C.red,border:"none",borderRadius:8,padding:"9px 13px",fontWeight:700,fontSize:12,cursor:"pointer",color:C.white,letterSpacing:"-0.3px"}}>출항 취소</button>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <button onClick={onClose} style={{padding:"13px",border:`1.5px solid #FFCCCC`,borderRadius:10,background:C.white,fontWeight:700,fontSize:14,cursor:"pointer",color:C.red,letterSpacing:"-0.3px"}}>식제</button>
+        <button onClick={onClose} style={{padding:"13px",border:"none",borderRadius:10,background:C.blue,fontWeight:700,fontSize:14,cursor:"pointer",color:C.white,letterSpacing:"-0.3px"}}>저장</button>
+      </div>
+    </div>
+    {showCancelConfirm&&<div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+      <div className="pop" style={{background:C.white,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340,position:"relative"}}>
+        <button onClick={()=>setShowCancelConfirm(false)} style={{position:"absolute",top:16,right:16,border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        <div style={{fontWeight:800,fontSize:18,color:C.black,textAlign:"center",marginBottom:12,letterSpacing:"-0.5px"}}>출항 취소 처리</div>
+        <div style={{fontSize:14,color:C.desc,textAlign:"center",marginBottom:10,lineHeight:1.6,letterSpacing:"-0.2px"}}>오늘(2026.02.27) 출항을<br/>취소하시겠습니까?</div>
+        <div style={{fontSize:12,color:C.red,textAlign:"center",fontWeight:600,marginBottom:24,lineHeight:1.6,letterSpacing:"-0.2px"}}>※ 예약 고객 6명에게 취소 알림과<br/>환불 안내가 즉시 발송됩니다.</div>
+        <button onClick={()=>setShowCancelConfirm(false)} style={{width:"100%",padding:"15px",background:C.red,color:C.white,border:"none",borderRadius:50,fontWeight:700,fontSize:15,cursor:"pointer",letterSpacing:"-0.3px",marginBottom:12}}>출항 취소</button>
+        <button onClick={()=>setShowCancelConfirm(false)} style={{width:"100%",padding:"10px",background:"transparent",color:C.desc,border:"none",fontWeight:600,fontSize:14,cursor:"pointer",letterSpacing:"-0.2px"}}>취소</button>
+      </div>
+    </div>}
+  </BottomSheet>;
+}
+
+/* ═══ SETTLEMENT ═══ */
+function SettlementScreen({onDetail,selectedBoatId,onSelectBoat}){
+  const [cy,setCy]=useState(2026);const [cm,setCm]=useState(2);
+  const hm=d=>{let m=cm+d,y=cy;if(m>12){m=1;y++;}if(m<1){m=12;y--;}setCm(m);setCy(y);};
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+    <AppHeader title="정산관리"/>
+    <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
+    <div style={{margin:"0 16px 8px",background:C.white,borderRadius:10,border:`1px solid ${C.line}`,padding:"9px 14px",display:"flex",gap:8,alignItems:"center",justifyContent:"center",fontSize:13,color:C.desc}}>
+      <span>2026. 02. 01</span><span style={{color:C.dimmed}}>—</span><span>2026. 02. 28</span>
+    </div>
+    <div style={{background:C.white,borderBottom:`8px solid ${C.bg3}`}}>
+      <MiniCalendar year={cy} month={cm} onMonth={hm} dotDates={[{date:"2026-02-03",label:"100"},{date:"2026-02-05",label:"97"},{date:"2026-02-24",label:"97"},{date:"2026-02-26",label:"97"}]}/>
+    </div>
+    <div style={{padding:"14px 16px 0"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div>
+          <span style={{fontWeight:700,fontSize:15,letterSpacing:"-0.5px"}}>정산목록</span>
+          <span style={{fontSize:12,color:C.desc,marginLeft:8}}>이번 달 <span style={{color:C.green,fontWeight:700}}>₩391원</span></span>
+        </div>
+        <button style={{background:C.green,color:C.white,border:"none",borderRadius:6,padding:"6px 12px",fontSize:11,fontWeight:600,cursor:"pointer",letterSpacing:"-0.2px"}}>엑셀 다운로드</button>
+      </div>
+      {SETTLEMENTS.map((s,i)=><div key={i} style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,marginBottom:10,overflow:"hidden"}}>
+        <div style={{padding:"14px 16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div><div style={{fontSize:11,color:C.dimmed,letterSpacing:"-0.2px",marginBottom:2}}>정산예정일</div><div style={{fontWeight:700,fontSize:15,letterSpacing:"-0.5px"}}>{s.date}</div></div>
+            <div style={{textAlign:"right"}}><div style={{fontSize:11,color:C.dimmed,marginBottom:2}}>최종 지급액</div><div style={{fontWeight:800,fontSize:22,color:C.blue,letterSpacing:"-1px"}}>{s.maxPay}원</div></div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:12}}>
+            {[["총 결제수",`${s.total}건`,""],["수수료",`${s.fee}원`,s.fee<0?C.red:""],["정산금액",`${s.amount}원`,""]].map(([l,v,c])=><div key={l}><div style={{fontSize:11,color:C.dimmed,marginBottom:2,letterSpacing:"-0.2px"}}>{l}</div><div style={{fontWeight:600,color:c||C.black,fontSize:14}}>{v}</div></div>)}
+          </div>
+        </div>
+        <button onClick={()=>onDetail(s)} style={{width:"100%",padding:"12px",border:"none",borderTop:`1px solid ${C.line}`,background:C.bg1,fontWeight:600,fontSize:13,color:C.blue,cursor:"pointer",letterSpacing:"-0.3px"}}>상세 내역 보기 →</button>
+      </div>)}
+    </div>
+  </div>;
+}
+
+function SettlementDetailScreen({onBack}){
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+    <AppHeader title="정산 상세내역" onBack={onBack}/>
+    <div style={{padding:16}}>
+      <div style={{background:"#E6F9F4",borderLeft:`4px solid ${C.green}`,borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:13,color:"#006B50",letterSpacing:"-0.3px"}}>정산 예정일 : 2026년 02월 24일</div>
+        <div style={{fontSize:12,color:"#008060",marginTop:2,letterSpacing:"-0.2px"}}>카카오뱅크 3333-132-301224로 입금 예정</div>
+      </div>
+      {[{title:"정산 계산",rows:[["정산기간","2026.02.21 ~ 2026.02.21"],["대상 금액","100원"],["수수료","-3원"],["최종 지급액","97원"]]},{title:"정산 계좌",rows:[["은행","카카오뱅크"],["계좌번호","3333132301224"],["예금주","신다훈"]]}].map(({title,rows})=><div key={title} style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,marginBottom:10}}>
+        <div style={{padding:"13px 16px"}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:11,letterSpacing:"-0.5px"}}>{title}</div>
+          {rows.map(([l,v])=>{const isLast=l==="최종 지급액";return <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:7,fontWeight:isLast?700:400,paddingTop:isLast?8:0,borderTop:isLast?`1px solid ${C.line}`:0,marginTop:isLast?4:0}}>
+            <span style={{color:isLast?C.black:C.desc}}>{l}</span><span style={{color:isLast?C.blue:C.black}}>{v}</span>
+          </div>;})}
+        </div>
+      </div>)}
+    </div>
+  </div>;
+}
+
+/* ═══ RESERVATION ═══ */
+function PlatformBadge({platform}){
+  const m={phone:{label:"전화",c:"#2D7D46",bg:"#E6F4EA"},naver:{label:"네이버",c:"#03C75A",bg:"#E6F9EE"},kakao:{label:"카카오",c:"#9B6800",bg:"#FFF8E0"},gangchi:{label:"갈치365",c:"#0055CC",bg:"#EBF0FF"},visit:{label:"직접방문",c:C.desc,bg:C.bg3},other:{label:"기타",c:C.desc,bg:C.bg3}};
+  if(!platform)return null;
+  const s=m[platform]||m.other;
+  return <span style={{fontSize:10,fontWeight:700,background:s.bg,color:s.c,padding:"2px 7px",borderRadius:4,letterSpacing:"-0.2px"}}>{s.label}</span>;
+}
+
+function ReservationScreen({onBack,allRsvs,addManualRsv,products,selectedBoatId,onSelectBoat}){
+  const rsvs=allRsvs||RESERVATIONS;
+  const [tab,setTab]=useState("전체");
+  const [toast,setToast]=useState("");
+  const [showAdd,setShowAdd]=useState(false);
+  const tabs=["전체","예약완료","입금대기","취소완료"];
+  const filtered=tab==="전체"?rsvs:rsvs.filter(r=>r.status===tab);
+  const handleAdd=rsv=>{addManualRsv&&addManualRsv(rsv);setShowAdd(false);setToast("예약이 추가됐습니다 ✓");};
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+    <AppHeader title="예약관리" onBack={onBack} right={
+      <button onClick={()=>setShowAdd(true)} style={{border:"none",background:C.blue,color:C.white,borderRadius:8,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px"}}>+ 직접추가</button>
+    }/>
+    <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
+    <div style={{padding:"0 16px 8px"}}>
+      <input placeholder="예약자명 · 예약번호 · 연락처 검색" style={{width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 14px",fontSize:13,background:C.white,letterSpacing:"-0.2px"}}/>
+    </div>
+    <div style={{padding:"4px 16px 8px",fontSize:13,color:C.desc,letterSpacing:"-0.2px"}}>
+      총 <b style={{color:C.blue}}>{rsvs.length}</b>건 · <b>{rsvs.reduce((s,r)=>s+r.adults+(r.kids||0),0)}</b>명
+    </div>
+    <div style={{display:"flex",gap:6,padding:"0 16px 10px",overflowX:"auto"}}>
+      {tabs.map(t=><button key={t} onClick={()=>setTab(t)} style={{flexShrink:0,padding:"6px 14px",borderRadius:50,border:`1.5px solid`,borderColor:tab===t?C.blue:C.line2,background:tab===t?C.blue:C.white,color:tab===t?C.white:C.desc,fontSize:12,fontWeight:600,cursor:"pointer",letterSpacing:"-0.2px"}}>{t}</button>)}
+    </div>
+    <div style={{padding:"0 16px"}}>
+      {filtered.map((r,i)=><div key={i} style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,marginBottom:10,overflow:"hidden"}}>
+        <div style={{padding:"13px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,fontSize:15,letterSpacing:"-0.5px"}}>{r.name}</span>
+              {r.isManual&&<PlatformBadge platform={r.platform}/>}
+            </div>
+            <StatusBadge status={r.status}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"68px 1fr",gap:"5px 0",fontSize:12}}>
+            <span style={{color:C.dimmed,letterSpacing:"-0.2px"}}>예약번호</span><span style={{color:C.blue,fontWeight:600,letterSpacing:"-0.3px"}}>{r.id}</span>
+            {r.date&&<><span style={{color:C.dimmed}}>결제일</span><span style={{color:C.desc}}>{r.date}</span></>}
+            <span style={{color:C.dimmed}}>연락처</span>
+            <span style={{display:"flex",alignItems:"center",gap:6,color:C.black}}>
+              {r.phone||"-"}
+              {r.phone&&<button onClick={()=>setToast(`${r.phone} 복사됨`)} style={{border:`1px solid ${C.line}`,borderRadius:4,padding:"1px 7px",fontSize:10,cursor:"pointer",color:C.desc,background:C.bg1,fontWeight:600}}>복사</button>}
+            </span>
+            <span style={{color:C.dimmed}}>인원</span><span>대인 {r.adults}명{r.kids>0?` · 소인 ${r.kids}명`:""}</span>
+            <span style={{color:C.dimmed}}>결제</span><span style={{color:C.desc}}>{r.method}</span>
+            <span style={{color:C.dimmed}}>금액</span><span style={{fontWeight:700,color:C.black,letterSpacing:"-0.3px"}}>{r.amount.toLocaleString()}원</span>
+          </div>
+        </div>
+        {r.status==="예약완료"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,borderTop:`1px solid ${C.line}`}}>
+          <button style={{padding:"11px",border:"none",background:C.bg1,fontSize:13,fontWeight:600,cursor:"pointer",color:C.desc,borderRight:`1px solid ${C.line}`,letterSpacing:"-0.2px"}}>예약취소</button>
+          <button style={{padding:"11px",border:"none",background:C.blueBg,fontSize:13,fontWeight:700,cursor:"pointer",color:C.blue,letterSpacing:"-0.2px"}}>예약확정 ✓</button>
+        </div>}
+        {r.status==="입금대기"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0,borderTop:`1px solid ${C.line}`}}>
+          <button style={{padding:"11px",border:"none",background:C.bg1,fontSize:13,fontWeight:600,cursor:"pointer",color:C.desc,borderRight:`1px solid ${C.line}`,letterSpacing:"-0.2px"}}>예약취소</button>
+          <button style={{padding:"11px",border:"none",background:"#FFF8E0",fontSize:13,fontWeight:700,cursor:"pointer",color:"#8A6400",letterSpacing:"-0.2px"}}>입금 확인</button>
+        </div>}
+      </div>)}
+    </div>
+    {showAdd&&<DirectReservationModal
+      onClose={()=>setShowAdd(false)}
+      onSave={handleAdd}
+      products={products||[]}
+    />}
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* ═══ PRODUCT MANAGEMENT ═══ */
+
+// 인원 조정 모달
+function CapacityModal({product,onClose,onSave}){
+  const [cap,setCap]=useState(product.capacity);
+  const [quickSel,setQuickSel]=useState(null);
+  const rem=cap-product.sold;
+  const handleQuick=(n)=>{setQuickSel(n);if(n==="마감")setCap(product.sold);else setCap(c=>c+n);};
+  return <BottomSheet title="인원 조정" onClose={onClose}>
+    <div style={{padding:"16px 20px 32px"}}>
+      <div style={{fontSize:13,color:C.desc,marginBottom:18,letterSpacing:"-0.3px"}}>{product.name} · 현재 예약 <b style={{color:C.blue}}>{product.sold}명</b></div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",border:`1.5px solid ${C.line2}`,borderRadius:10,overflow:"hidden",marginBottom:14}}>
+        <button onClick={()=>setCap(c=>Math.max(product.sold,c-1))} style={{width:52,height:54,border:"none",background:C.bg3,fontSize:24,cursor:"pointer",fontWeight:700,color:C.desc,flexShrink:0}}>−</button>
+        <span style={{flex:1,textAlign:"center",fontSize:28,fontWeight:800,color:C.black,letterSpacing:"-1px"}}>{cap}</span>
+        <button onClick={()=>setCap(c=>c+1)} style={{width:52,height:54,border:"none",background:C.bg3,fontSize:24,cursor:"pointer",fontWeight:700,color:C.desc,flexShrink:0}}>+</button>
+      </div>
+      <div style={{display:"flex",gap:7,marginBottom:18}}>
+        {[1,2,3,5].map(n=><button key={n} onClick={()=>handleQuick(n)} style={{flex:1,padding:"10px 0",border:`1.5px solid`,borderColor:quickSel===n?C.blue:C.line2,borderRadius:8,cursor:"pointer",background:quickSel===n?C.blueBg:C.white,fontWeight:700,color:quickSel===n?C.blue:C.desc,fontSize:13,letterSpacing:"-0.2px"}}>+{n}</button>)}
+        <button onClick={()=>handleQuick("마감")} style={{flex:1,padding:"10px 0",border:`1.5px solid #FFD0D0`,borderRadius:8,cursor:"pointer",background:quickSel==="마감"?"#FFF5F5":C.white,fontWeight:700,color:C.red,fontSize:13,letterSpacing:"-0.2px"}}>마감</button>
+      </div>
+      <div style={{background:C.bg2,borderRadius:10,padding:"12px 14px",marginBottom:20,display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:0}}>
+        {[["총 정원",`${cap}명`,C.black],["예약",`${product.sold}명`,C.blue],["잔여",`${rem}석`,rem===0?C.red:C.green],["점유율",`${Math.round(product.sold/Math.max(cap,1)*100)}%`,C.desc]].map(([l,v,c],i)=><div key={l} style={{textAlign:"center",borderRight:i<3?`1px solid ${C.line}`:"none"}}>
+          <div style={{fontSize:10,color:C.dimmed,marginBottom:3,letterSpacing:"-0.2px"}}>{l}</div>
+          <div style={{fontWeight:700,color:c,fontSize:14,letterSpacing:"-0.3px"}}>{v}</div>
+        </div>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <button onClick={onClose} style={{padding:"13px",border:`1.5px solid ${C.line2}`,borderRadius:10,background:C.white,fontWeight:600,fontSize:14,cursor:"pointer",color:C.desc,letterSpacing:"-0.3px"}}>취소</button>
+        <button onClick={()=>onSave(cap)} style={{padding:"13px",border:"none",borderRadius:10,background:C.blue,fontWeight:700,fontSize:14,cursor:"pointer",color:C.white,letterSpacing:"-0.3px"}}>저장</button>
+      </div>
+    </div>
+  </BottomSheet>;
+}
+
+// 수정 모달
+function ProductEditModal({product,onClose,onSave}){
+  const [form,setForm]=useState({...product});
+  const [fish,setFish]=useState([...product.fish]);
+  const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
+  const toggleFish=f=>setFish(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f]);
+  const labelStyle={fontSize:12,color:C.desc,marginBottom:5,fontWeight:600,letterSpacing:"-0.2px"};
+  const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
+  return <BottomSheet title="상품 수정" onClose={onClose} maxHeight="94vh">
+    <div style={{padding:"16px 20px 32px"}}>
+      <div style={{marginBottom:14}}>
+        <div style={labelStyle}>상품명 <span style={{color:C.red}}>*</span></div>
+        <input value={form.name} onChange={set("name")} style={inputStyle}/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={labelStyle}>판매 상태</div>
+        <div style={{display:"flex",gap:8}}>
+          {[["selling","판매중"],["stop","판매중지"],["마감","오늘마감"]].map(([s,l])=><button key={s} onClick={()=>setForm(f=>({...f,status:s}))} style={{flex:1,padding:"10px 0",border:`1.5px solid`,borderColor:form.status===s?C.black:C.line2,borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13,background:form.status===s?C.black:C.white,color:form.status===s?C.white:C.dimmed,letterSpacing:"-0.2px"}}>{l}</button>)}
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div>
+          <div style={labelStyle}>판매가격 <span style={{color:C.red}}>*</span></div>
+          <input value={form.price} onChange={set("price")} type="number" style={inputStyle}/>
+        </div>
+        <div>
+          <div style={labelStyle}>총 정원</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <button onClick={()=>setForm(f=>({...f,capacity:Math.max(f.sold,f.capacity-1)}))} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${C.line2}`,background:C.white,fontSize:18,cursor:"pointer",fontWeight:700,flexShrink:0,color:C.desc}}>−</button>
+            <span style={{fontSize:18,fontWeight:800,flex:1,textAlign:"center",letterSpacing:"-0.5px",color:C.black}}>{form.capacity}</span>
+            <button onClick={()=>setForm(f=>({...f,capacity:f.capacity+1}))} style={{width:36,height:36,borderRadius:8,border:`1.5px solid ${C.blue}`,background:C.blueBg,fontSize:18,cursor:"pointer",fontWeight:700,color:C.blue,flexShrink:0}}>+</button>
+          </div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        {[["출항시간","depart"],["입항시간","arrive"]].map(([l,k])=><div key={k}>
+          <div style={labelStyle}>{l}</div>
+          <select value={form[k]} onChange={set(k)} style={inputStyle}>
+            {Array.from({length:48},(_,i)=>{const h=String(Math.floor(i/2)).padStart(2,'0'),m=i%2===0?'00':'30';return `${h}:${m}`;}).map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>)}
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={labelStyle}>어종 선택</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {FISH_TAGS.map(f=><button key={f} onClick={()=>toggleFish(f)} style={{padding:"5px 11px",borderRadius:50,border:`1.5px solid`,borderColor:fish.includes(f)?C.blue:C.line,background:fish.includes(f)?C.blueBg:C.white,color:fish.includes(f)?C.blue:C.desc,fontSize:12,cursor:"pointer",fontWeight:fish.includes(f)?700:400,letterSpacing:"-0.2px"}}>{f}</button>)}
+        </div>
+      </div>
+      <div style={{marginBottom:20}}>
+        <div style={labelStyle}>메모 (선주님만 보임)</div>
+        <textarea value={form.memo} onChange={set("memo")} rows={2} placeholder="미끼 종류, 특이사항 등" style={{...inputStyle,resize:"none",fontFamily:"inherit"}}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <Btn label="취소" onClick={onClose} variant="line"/>
+        <Btn label="수정 저장" onClick={()=>onSave({...form,fish})} variant="primary"/>
+      </div>
+    </div>
+  </BottomSheet>;
+}
+
+// 예약 명단 모달
+function ReservationListModal({product,onClose,allRsvs}){
+  const baseRsvs=allRsvs||RESERVATIONS;
+  const rsvs=baseRsvs.filter(r=>r.prodId===product.id);
+  const dateStr=`${product.date.slice(0,4)}년 ${product.date.slice(5,7).replace(/^0/,"")}월 ${product.date.slice(8,10).replace(/^0/,"")}일`;
+  return <BottomSheet title="예약자 명단" onClose={onClose}>
+    <div style={{padding:"0 0 32px"}}>
+      <div style={{padding:"12px 20px 14px",borderBottom:`1px solid ${C.line}`}}>
+        <div style={{fontWeight:700,fontSize:15,color:C.black,letterSpacing:"-0.5px"}}>{product.name}</div>
+        <div style={{fontSize:12,color:C.desc,marginTop:3,letterSpacing:"-0.2px"}}>{dateStr} · 총 <span style={{color:C.blue,fontWeight:700}}>{rsvs.length}건</span></div>
+      </div>
+      {rsvs.length===0&&<div style={{padding:"40px 0",textAlign:"center",color:C.dimmed,fontSize:13}}>예약자가 없습니다.</div>}
+      {rsvs.map((r,i)=><div key={i} style={{padding:"14px 20px",borderBottom:`1px solid ${C.line}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+          <span style={{fontWeight:700,fontSize:15,color:C.black,letterSpacing:"-0.5px"}}>{r.name}</span>
+          <StatusBadge status={r.status}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12}}>
+          <span style={{color:C.desc,letterSpacing:"-0.2px"}}>대인 {r.adults}명{r.kids>0?` · 소인 ${r.kids}명`:""} · {r.phone||"-"}</span>
+          <span style={{color:C.dimmed,letterSpacing:"-0.2px"}}>{r.method}</span>
+        </div>
+      </div>)}
+      <div style={{padding:"16px 20px 0",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <button style={{padding:"13px",border:`1.5px solid ${C.blue}`,borderRadius:10,background:C.blue,fontWeight:700,fontSize:13,cursor:"pointer",color:C.white,letterSpacing:"-0.3px"}}>명단 복사</button>
+        <button onClick={onClose} style={{padding:"13px",border:`1.5px solid ${C.line2}`,borderRadius:10,background:C.white,fontWeight:600,fontSize:13,cursor:"pointer",color:C.desc,letterSpacing:"-0.3px"}}>닫기</button>
+      </div>
+    </div>
+  </BottomSheet>;
+}
+
+// 선주 의견 반영 ③ 상품 복사 모달
+function CopyProductModal({product,onClose,onCopy}){
+  const [targetDate,setTargetDate]=useState(addDays(product.date,1));
+  const [showCal,setShowCal]=useState(false);
+  const [calY,setCalY]=useState(2026);const [calM,setCalM]=useState(2);
+  const fmt=d=>d?d.replace(/-/g,". ").replace(/(\d{4})\. (\d{2})\. (\d{2})/,"$1. $2. $3"):"";
+  const hm=d=>{let m=calM+d,y=calY;if(m>12){m=1;y++;}if(m<1){m=12;y--;}setCalM(m);setCalY(y);};
+  return <BottomSheet title="상품 복사 등록" onClose={onClose}>
+    <div style={{padding:"16px 20px 32px"}}>
+      {/* 상품 요약 카드 */}
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"13px 14px",marginBottom:18,boxShadow:"0 2px 8px rgba(0,0,0,.06)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:14,color:C.black,letterSpacing:"-0.3px"}}>{product.name}</div>
+            <div style={{fontSize:11,color:C.desc,marginTop:3,letterSpacing:"-0.2px"}}>{product.fish.join(" · ")}</div>
+            <div style={{fontSize:11,color:C.desc,marginTop:1,letterSpacing:"-0.2px"}}>{product.depart}~{product.arrive} · 정원 {product.capacity}명</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:10,color:C.dimmed,marginBottom:2}}>1인</div>
+            <div style={{fontWeight:800,fontSize:15,color:C.blue,letterSpacing:"-0.5px"}}>{product.price.toLocaleString()}원</div>
+          </div>
+        </div>
+      </div>
+      {/* 날짜 선택 칩 */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:12,color:C.desc,fontWeight:600,marginBottom:8,letterSpacing:"-0.2px"}}>등록할 날짜 선택</div>
+        <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+          {[1,2,3,7].map(n=>{
+            const d=addDays(product.date,n);
+            const isActive=targetDate===d;
+            return <button key={n} onClick={()=>setTargetDate(d)} style={{padding:"8px 14px",borderRadius:8,border:`1.5px solid`,borderColor:isActive?C.blue:C.line2,background:isActive?C.white:C.white,color:isActive?C.blue:C.desc,fontSize:12,fontWeight:isActive?700:500,cursor:"pointer",letterSpacing:"-0.2px",boxShadow:isActive?`inset 0 0 0 1px ${C.blue}`:"none"}}>
+              +{n}일 ({d.slice(5).replace("-",".")})
+            </button>;
+          })}
+        </div>
+      </div>
+      {/* 선택된 날짜 표시 + 캘린더 버튼 */}
+      <div onClick={()=>setShowCal(!showCal)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",border:`1.5px solid ${C.line2}`,borderRadius:10,padding:"12px 14px",background:C.white,cursor:"pointer",marginBottom:14}}>
+        <span style={{fontSize:14,fontWeight:600,color:C.black,letterSpacing:"-0.3px"}}>{fmt(targetDate)}</span>
+        <span style={{fontSize:18}}>🗓</span>
+      </div>
+      {/* 캘린더 */}
+      {showCal&&<div style={{border:`1px solid ${C.line}`,borderRadius:12,overflow:"hidden",marginBottom:14,background:C.white}}>
+        <MiniCalendar year={calY} month={calM} onMonth={hm} selectedDate={targetDate} onSelect={d=>{setTargetDate(d);setShowCal(false);}}/>
+      </div>}
+      {/* 안내 */}
+      <div style={{background:"#EBF0FF",borderRadius:8,padding:"11px 14px",marginBottom:20,fontSize:12,color:C.blue,lineHeight:1.6,letterSpacing:"-0.2px"}}>
+        <b>복사되는 항목</b><br/>
+        상품명, 가격, 정원, 출/입항 시간, 어종<br/>
+        <span style={{color:C.desc,fontSize:11}}>(예약 0명으로 새 상품이 등록됩니다.)</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <Btn label="취소" onClick={onClose} variant="line"/>
+        <Btn label="이 날짜로 복사" onClick={()=>onCopy(targetDate)} variant="primary"/>
+      </div>
+    </div>
+  </BottomSheet>;
+}
+
+/* ─── DIRECT RESERVATION MODAL ─────────── */
+const PLATFORMS=[
+  {key:"phone",label:"전화예약"},
+  {key:"naver",label:"네이버"},
+  {key:"kakao",label:"카카오"},
+  {key:"gangchi",label:"갈치365"},
+  {key:"visit",label:"직접방문"},
+  {key:"other",label:"기타"},
+];
+const PAY_METHODS=['직접입금','현금','카카오페이','네이버페이','현장결제','무통장입금'];
+
+function DirectReservationModal({onClose,onSave,products,defaultProductId}){
+  const [platform,setPlatform]=useState('phone');
+  const [name,setName]=useState('');
+  const [phone,setPhone]=useState('');
+  const [prodId,setProdId]=useState(defaultProductId?String(defaultProductId):'');
+  const [adults,setAdults]=useState(1);
+  const [kids,setKids]=useState(0);
+  const [payMethod,setPayMethod]=useState('직접입금');
+  const [amount,setAmount]=useState('');
+  const [status,setStatus]=useState('예약완료');
+  const [memo,setMemo]=useState('');
+  const [err,setErr]=useState('');
+
+  const selProd=products.find(p=>p.id===Number(prodId));
+  useEffect(()=>{
+    if(selProd)setAmount(String(selProd.price*adults));
+  },[selProd&&selProd.id,adults]);
+
+  const inputSt={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
+  const labelSt={fontSize:12,fontWeight:600,color:C.desc,marginBottom:6,letterSpacing:'-0.2px'};
+
+  const save=()=>{
+    if(!name.trim()){setErr('예약자 이름을 입력해주세요.');return;}
+    if(!prodId){setErr('상품을 선택해주세요.');return;}
+    const today=new Date();
+    const id='M-'+today.getFullYear()+String(today.getMonth()+1).padStart(2,'0')+String(today.getDate()).padStart(2,'0')+'-'+String(Math.floor(Math.random()*9000)+1000);
+    onSave({id,prodId:Number(prodId),name,phone,adults,kids,method:payMethod,amount:Number(amount)||0,status,memo,platform,date:today.toISOString().slice(0,10)+' '+String(today.getHours()).padStart(2,'0')+':'+String(today.getMinutes()).padStart(2,'0'),isManual:true});
+  };
+
+  const pl=PLATFORMS.find(p=>p.key===platform)||PLATFORMS[0];
+
+  return <div className="fade" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:500,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <div className="slide-up" style={{width:390,background:C.white,borderRadius:'16px 16px 0 0',maxHeight:'94vh',overflowY:'auto'}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:16,letterSpacing:'-0.5px'}}>예약 직접 추가</div>
+          <div style={{fontSize:11,color:C.desc,marginTop:2,letterSpacing:'-0.2px'}}>전화·타플랫폼·현장 예약을 직접 등록합니다</div>
+        </div>
+        <button onClick={onClose} style={{border:'none',background:'transparent',fontSize:20,cursor:'pointer',color:C.dimmed,width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+      </div>
+      <div style={{padding:'16px 20px 32px'}}>
+        <div style={{marginBottom:18}}>
+          <div style={labelSt}>예약 경로 <span style={{color:C.red}}>*</span></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            {PLATFORMS.map(p=><button key={p.key} onClick={()=>setPlatform(p.key)} style={{padding:"11px 0",border:`1.5px solid`,borderColor:platform===p.key?C.black:C.line2,borderRadius:8,background:platform===p.key?C.black:C.white,cursor:"pointer"}}>
+              <span style={{fontSize:13,fontWeight:700,color:platform===p.key?C.white:C.desc,letterSpacing:"-0.3px"}}>{p.label}</span>
+            </button>)}
+          </div>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelSt}>예약자 이름 <span style={{color:C.red}}>*</span></div>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="홍길동" style={inputSt}/>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelSt}>연락처 <span style={{color:C.red}}>*</span></div>
+          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" type="tel" style={inputSt}/>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelSt}>상품 선택 <span style={{color:C.red}}>*</span></div>
+          <select value={prodId} onChange={e=>setProdId(e.target.value)} style={{...inputSt,color:prodId?C.black:C.dimmed}}>
+            <option value="">상품을 선택해주세요</option>
+            {products.filter(p=>p.status==='selling').map(p=><option key={p.id} value={p.id}>[{p.date.slice(5).replace('-','.')}] {p.name} ({p.price.toLocaleString()}원)</option>)}
+          </select>
+          {selProd&&<div style={{marginTop:6,background:C.blueBg,borderRadius:6,padding:'7px 10px',fontSize:11,color:C.blue,letterSpacing:'-0.2px'}}>
+            {selProd.depart}~{selProd.arrive} · {selProd.sold}/{selProd.capacity}석
+          </div>}
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelSt}>탑승 인원</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            {[['대인',adults,setAdults,1],['소인(할인)',kids,setKids,0]].map(([l,v,set,min])=><div key={l}>
+              <div style={{fontSize:11,color:C.dimmed,marginBottom:5,letterSpacing:'-0.2px'}}>{l}</div>
+              <div style={{display:"flex",alignItems:"center",border:`1.5px solid ${C.line2}`,borderRadius:8,overflow:"hidden"}}>
+                <button onClick={()=>set(n=>Math.max(min,n-1))} style={{width:40,border:'none',background:C.bg3,fontSize:18,cursor:'pointer',height:42,fontWeight:700,flexShrink:0,color:C.desc}}>−</button>
+                <span style={{flex:1,textAlign:'center',fontWeight:800,fontSize:17,letterSpacing:'-0.5px',color:C.black}}>{v}</span>
+                <button onClick={()=>set(n=>n+1)} style={{width:40,border:'none',background:C.blueBg,fontSize:18,cursor:'pointer',height:42,fontWeight:700,flexShrink:0,color:C.blue}}>+</button>
+              </div>
+            </div>)}
+          </div>
+        </div>
+        {/* 출항/입항 시간 */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+          {[['출항시간',selProd?selProd.depart:'05:00'],['입항시간',selProd?selProd.arrive:'15:30']].map(([l,v])=><div key={l}>
+            <div style={labelSt}>{l}</div>
+            <select style={{...inputSt,color:C.black}}>
+              {Array.from({length:48},(_,i)=>{const h=String(Math.floor(i/2)).padStart(2,'0'),m=i%2===0?'00':'30';return `${h}:${m}`;}).map(t=><option key={t} selected={t===v}>{t}</option>)}
+            </select>
+          </div>)}
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelSt}>결제 방법</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {PAY_METHODS.map(m=><button key={m} onClick={()=>setPayMethod(m)} style={{padding:'6px 12px',borderRadius:50,border:'1.5px solid',borderColor:payMethod===m?C.blue:C.line,background:payMethod===m?C.blue:C.white,color:payMethod===m?C.white:C.desc,fontSize:12,fontWeight:600,cursor:'pointer',letterSpacing:'-0.2px'}}>{m}</button>)}
+          </div>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <div style={labelSt}>결제 금액</div>
+            {selProd&&<button onClick={()=>setAmount(String(selProd.price*(adults+kids)))} style={{border:'none',background:'transparent',fontSize:11,color:C.blue,cursor:'pointer',fontWeight:600,letterSpacing:'-0.2px'}}>자동계산</button>}
+          </div>
+          <div style={{position:'relative'}}>
+            <input value={amount} onChange={e=>setAmount(e.target.value)} type="number" placeholder="0" style={{...inputSt,paddingRight:32}}/>
+            <span style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',fontSize:13,color:C.desc}}>원</span>
+          </div>
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={labelSt}>예약 상태</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+            {[['예약완료',C.blue,C.blueBg],['입금대기','#B07D00','#FFF8E0']].map(([s,c,bg])=><button key={s} onClick={()=>setStatus(s)} style={{padding:'11px',border:'1.5px solid',borderColor:status===s?c:C.line,borderRadius:8,background:status===s?bg:C.white,color:status===s?c:C.dimmed,fontWeight:700,fontSize:13,cursor:'pointer',letterSpacing:'-0.3px'}}>{s}</button>)}
+          </div>
+        </div>
+        <div style={{marginBottom:20}}>
+          <div style={labelSt}>메모 (선주님만 보임)</div>
+          <textarea value={memo} onChange={e=>setMemo(e.target.value)} rows={2} placeholder="특이사항, 낚시 경력 등" style={{...inputSt,resize:'none',fontFamily:'inherit'}}/>
+        </div>
+        {err&&<div style={{background:"#FFF0F0",border:`1px solid #FFD0D0`,borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:12,color:C.red,fontWeight:600,letterSpacing:"-0.2px"}}>⚠ {err}</div>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Btn label="취소" onClick={onClose} variant="line"/>
+          <Btn label="수정 저장" onClick={save} variant="primary"/>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+/* ─── DATE SELECTOR ─────────── */
+function ProductDateSelector({year,month,onMonth,selDate,onSelDate,products}){
+  // 해당 월의 날짜별 상품 수 집계
+  const monthStr=`${year}-${String(month).padStart(2,"0")}`;
+  const dateSet={};
+  products.forEach(p=>{
+    if(p.date.startsWith(monthStr)){
+      if(!dateSet[p.date])dateSet[p.date]={total:0,selling:0};
+      dateSet[p.date].total++;
+      if(p.status==="selling")dateSet[p.date].selling++;
+    }
+  });
+  const daysInMonth=new Date(year,month,0).getDate();
+  const allDates=Array.from({length:daysInMonth},(_,i)=>{
+    const d=`${year}-${String(month).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`;
+    return{date:d,day:i+1,dow:new Date(d).getDay(),info:dateSet[d]||null};
+  });
+  const scrollRef=useRef(null);
+
+  // 선택된 날짜 칩으로 자동 스크롤
+  useEffect(()=>{
+    if(!scrollRef.current||!selDate)return;
+    const chip=scrollRef.current.querySelector(`[data-date="${selDate}"]`);
+    if(chip)chip.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+  },[selDate]);
+
+  return <div style={{background:C.white,borderBottom:`1px solid ${C.line}`}}>
+    {/* 월 네비게이션 */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px 10px"}}>
+      <button onClick={()=>onMonth(-1)} style={{width:34,height:34,borderRadius:8,border:`1.5px solid ${C.line}`,background:C.white,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:C.desc,fontWeight:700}}>‹</button>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontWeight:800,fontSize:17,color:C.black,letterSpacing:"-0.6px"}}>{year}년 {month}월</span>
+        {/* 이번 달로 돌아오기 */}
+        {!(year===2026&&month===2)&&<button onClick={()=>{onMonth("reset");}} style={{border:`1.5px solid ${C.line}`,borderRadius:50,padding:"3px 10px",fontSize:11,fontWeight:600,color:C.desc,background:C.bg3,cursor:"pointer",letterSpacing:"-0.2px"}}>이번 달</button>}
+      </div>
+      <button onClick={()=>onMonth(1)} style={{width:34,height:34,borderRadius:8,border:`1.5px solid ${C.line}`,background:C.white,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:C.desc,fontWeight:700}}>›</button>
+    </div>
+
+    {/* 월 전체 / 날짜 칩 */}
+    <div ref={scrollRef} style={{display:"flex",gap:6,overflowX:"auto",padding:"0 16px 14px",alignItems:"flex-end"}}>
+      {/* 전체 칩 */}
+      <button
+        onClick={()=>onSelDate(null)}
+        style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"8px 10px",borderRadius:10,border:`1.5px solid`,borderColor:selDate===null?C.blue:C.line,background:selDate===null?C.blue:C.white,cursor:"pointer",minWidth:44}}
+      >
+        <span style={{fontSize:10,fontWeight:700,color:selDate===null?C.white:C.desc,letterSpacing:"-0.2px"}}>전체</span>
+        <span style={{fontSize:16,fontWeight:800,color:selDate===null?C.white:C.black,letterSpacing:"-0.5px",lineHeight:1}}>
+          {Object.keys(dateSet).length}
+        </span>
+        <span style={{fontSize:9,color:selDate===null?"rgba(255,255,255,.7)":C.dimmed,letterSpacing:"-0.2px"}}>일</span>
+      </button>
+
+      {/* 날짜 칩들 */}
+      {allDates.map(({date,day,dow,info})=>{
+        const isActive=selDate===date;
+        const hasProd=!!info;
+        const isSun=dow===0; const isSat=dow===6;
+        const dayColor=isSun?C.red:isSat?C.blue:C.desc;
+        return <button
+          key={date}
+          data-date={date}
+          onClick={()=>onSelDate(isActive?null:date)}
+          style={{
+            flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+            padding:"8px 6px",borderRadius:10,border:`1.5px solid`,
+            borderColor:isActive?C.blue:hasProd?C.line2:C.line,
+            background:isActive?C.blue:hasProd?C.white:"transparent",
+            cursor:"pointer",minWidth:40,opacity:hasProd?1:0.4,
+          }}
+        >
+          <span style={{fontSize:10,fontWeight:600,color:isActive?C.white:dayColor,letterSpacing:"-0.2px"}}>{DAY_KO[dow]}</span>
+          <span style={{fontSize:17,fontWeight:800,color:isActive?C.white:hasProd?C.black:C.dimmed,letterSpacing:"-0.5px",lineHeight:1}}>{day}</span>
+          {hasProd
+            ?<span style={{fontSize:9,fontWeight:700,color:isActive?C.yellow:C.blue,letterSpacing:"-0.2px"}}>{info.total}개</span>
+            :<span style={{fontSize:9,color:"transparent"}}>-</span>
+          }
+        </button>;
+      })}
+    </div>
+  </div>;
+}
+
+/* ─── PRODUCT MANAGEMENT (마스터상품 + 일자별상품) ─── */
+
+/* 일자별상품 개별수정 모달 */
+function DailyProductEditModal({product:p, onClose, onSave}){
+  const times=[];
+  for(let h=0;h<24;h++){times.push(`${String(h).padStart(2,"0")}:00`);times.push(`${String(h).padStart(2,"0")}:30`);}
+  const [form,setForm]=useState({
+    bpiName:p.bpiName,
+    bpiSReleaseTime:p.bpiSReleaseTime,
+    bpiEReleaseTime:p.bpiEReleaseTime,
+    bpiReleaseDay:p.bpiReleaseDay,
+    bpiQty:p.bpiQty,
+    bpiAdultRate:p.bpiAdultRate,
+    bpiAdultWeekendRate:p.bpiAdultWeekendRate,
+    bpiKidsRate:p.bpiKidsRate,
+    bpiKidsWeekendRate:p.bpiKidsWeekendRate,
+    bpiMinPeople:p.bpiMinPeople,
+    bpiMaxPeople:p.bpiMaxPeople,
+    bpiIsWeekendRate:p.bpiIsWeekendRate,
+    bpiIsKidsRate:p.bpiIsKidsRate,
+    bpiIsDisplay:p.bpiIsDisplay,
+  });
+  const upd=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const inputSt={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px",boxSizing:"border-box"};
+  const labelSt={fontWeight:600,fontSize:13,marginBottom:6,color:C.black,letterSpacing:"-0.3px"};
+  const rowSt={marginBottom:18};
+
+  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+    <div className="slide-up" style={{width:390,background:C.white,borderRadius:"16px 16px 0 0",maxHeight:"88vh",overflowY:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:16,letterSpacing:"-0.5px"}}>일자별 상품 개별수정</div>
+          <div style={{fontSize:11,color:C.dimmed,marginTop:2,letterSpacing:"-0.2px"}}>{p.date.replace(/-/g,".")} · {p.bpiName}</div>
+        </div>
+        <button onClick={onClose} style={{border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed}}>✕</button>
+      </div>
+
+      <div style={{background:"#FFF8E0",padding:"10px 20px",borderBottom:`1px solid #FFE580`}}>
+        <div style={{fontSize:12,color:"#8A6400",letterSpacing:"-0.2px",lineHeight:1.5}}>
+          ⚠ 이 날짜 상품만 개별적으로 수정됩니다.<br/>출조종류 설정은 변경되지 않습니다.
+        </div>
+      </div>
+
+      <div style={{padding:"20px 20px 100px"}}>
+        {/* 노출 여부 */}
+        <div style={{...rowSt,display:"flex",alignItems:"center",justifyContent:"space-between",background:C.bg3,borderRadius:10,padding:"12px 14px"}}>
+          <div>
+            <div style={{fontWeight:600,fontSize:13,color:C.black,letterSpacing:"-0.3px"}}>노출 여부</div>
+            <div style={{fontSize:11,color:C.dimmed,marginTop:2}}>끄면 고객에게 이 날짜 상품이 보이지 않습니다</div>
+          </div>
+          <Toggle value={form.bpiIsDisplay} onChange={v=>upd("bpiIsDisplay",v)} size="sm"/>
+        </div>
+
+        {/* 상품명 */}
+        <div style={rowSt}>
+          <div style={labelSt}>상품명</div>
+          <input value={form.bpiName} onChange={e=>upd("bpiName",e.target.value)} style={inputSt}/>
+        </div>
+
+        {/* 출조/복귀 시간 */}
+        <div style={rowSt}>
+          <div style={labelSt}>출조/복귀 시간</div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <select value={form.bpiSReleaseTime} onChange={e=>upd("bpiSReleaseTime",e.target.value)} style={{...inputSt,flex:1}}>
+              {times.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+            <span style={{color:C.dimmed,flexShrink:0}}>~</span>
+            <select value={form.bpiEReleaseTime} onChange={e=>upd("bpiEReleaseTime",e.target.value)} style={{...inputSt,flex:1}}>
+              {times.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            {[["T","당일"],["N","익일"]].map(([v,l])=><button key={v} onClick={()=>upd("bpiReleaseDay",v)} style={{flex:1,padding:"7px",border:`1.5px solid ${form.bpiReleaseDay===v?C.blue:C.line2}`,borderRadius:7,background:form.bpiReleaseDay===v?C.blueBg:C.white,color:form.bpiReleaseDay===v?C.blue:C.desc,fontSize:12,fontWeight:700,cursor:"pointer"}}>{l} 복귀</button>)}
+          </div>
+        </div>
+
+        {/* 판매 좌석 수 */}
+        <div style={rowSt}>
+          <div style={labelSt}>판매 좌석 수</div>
+          <input type="number" value={form.bpiQty} onChange={e=>upd("bpiQty",Math.max(p.sold,+e.target.value))} style={inputSt} min={p.sold}/>
+          {p.sold>0&&<div style={{fontSize:11,color:C.dimmed,marginTop:4}}>현재 예약 {p.sold}명 이하로 줄일 수 없습니다</div>}
+        </div>
+
+        {/* 요금 */}
+        <div style={rowSt}>
+          <div style={labelSt}>요금</div>
+          <div style={{background:C.bg3,borderRadius:10,padding:"14px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>대인 평일</div>
+                <input type="number" value={form.bpiAdultRate} onChange={e=>upd("bpiAdultRate",+e.target.value)} style={{...inputSt,fontSize:13}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>대인 주말</div>
+                <input type="number" value={form.bpiAdultWeekendRate} onChange={e=>upd("bpiAdultWeekendRate",+e.target.value)} style={{...inputSt,fontSize:13}} disabled={!form.bpiIsWeekendRate}/>
+              </div>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                <Toggle value={form.bpiIsWeekendRate} onChange={v=>upd("bpiIsWeekendRate",v)} size="sm"/>
+                <span style={{fontSize:12,fontWeight:600,color:C.desc}}>주말 요금 별도 적용</span>
+              </label>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>소인 평일</div>
+                <input type="number" value={form.bpiKidsRate} onChange={e=>upd("bpiKidsRate",+e.target.value)} style={{...inputSt,fontSize:13}} disabled={!form.bpiIsKidsRate}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>소인 주말</div>
+                <input type="number" value={form.bpiKidsWeekendRate} onChange={e=>upd("bpiKidsWeekendRate",+e.target.value)} style={{...inputSt,fontSize:13}} disabled={!form.bpiIsKidsRate||!form.bpiIsWeekendRate}/>
+              </div>
+            </div>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+              <Toggle value={form.bpiIsKidsRate} onChange={v=>upd("bpiIsKidsRate",v)} size="sm"/>
+              <span style={{fontSize:12,fontWeight:600,color:C.desc}}>소인 요금 사용</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div style={{position:"sticky",bottom:0,background:C.white,padding:"12px 20px 24px",borderTop:`1px solid ${C.line}`,display:"flex",gap:10}}>
+        <Btn label="취소" onClick={onClose} variant="line" full/>
+        <Btn label="수정 저장" onClick={()=>onSave({...p,...form})} variant="primary" full/>
+      </div>
+    </div>
+  </div>;
+}
+
+/* 마스터상품 등록/수정 모달 */
+function MasterProductModal({master, onClose, onSave}){
+  const isEdit=!!master;
+  const WEEKS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const [form,setForm]=useState(master||{
+    name:"", fishSpecies:[],
+    minPeople:1, maxPeople:11,
+    sReleaseDt:"0101", eReleaseDt:"1231",
+    releaseDate:"T", releaseWeek:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+    sReleaseTime:"05:00", eReleaseTime:"15:30", releaseDay:"T",
+    adultRate:"", adultWeekendRate:"", kidsRate:"", kidsWeekendRate:"",
+    isWeekendRate:false, isKidsRate:false,
+    isBus:false, busInfo:"",
+    seatType:"D", productsFee:3, notes:"",
+  });
+  const upd=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const toggleFish=f=>upd("fishSpecies",form.fishSpecies.includes(f)?form.fishSpecies.filter(x=>x!==f):[...form.fishSpecies,f]);
+  const toggleWeek=w=>upd("releaseWeek",form.releaseWeek.includes(w)?form.releaseWeek.filter(x=>x!==w):[...form.releaseWeek,w]);
+  const labelSt={fontWeight:600,fontSize:13,marginBottom:6,color:C.black,letterSpacing:"-0.3px"};
+  const inputSt={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px",boxSizing:"border-box"};
+  const rowSt={marginBottom:18};
+  const chipSt=(on)=>({display:"inline-block",padding:"5px 11px",borderRadius:50,border:`1.5px solid ${on?C.blue:C.line2}`,background:on?C.blueBg:C.white,color:on?C.blue:C.desc,fontSize:12,cursor:"pointer",fontWeight:on?700:400,letterSpacing:"-0.2px",marginRight:5,marginBottom:5});
+  const times=[];for(let h=0;h<24;h++){times.push(`${String(h).padStart(2,"0")}:00`);times.push(`${String(h).padStart(2,"0")}:30`);}
+  const mmdd=v=>{const s=String(v).padStart(4,"0");return `${s.slice(0,2)}/${s.slice(2)}`;};
+
+  return <div className="fade" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:500,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+    <div className="slide-up" style={{width:390,background:C.white,borderRadius:"16px 16px 0 0",maxHeight:"94vh",overflowY:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"17px 20px 15px",borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
+        <span style={{fontWeight:700,fontSize:16,letterSpacing:"-0.5px"}}>{isEdit?"출조종류 수정":"출조종류 등록"}</span>
+        <button onClick={onClose} style={{border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed}}>✕</button>
+      </div>
+      <div style={{padding:"20px 20px 100px"}}>
+
+        {/* 상품명 */}
+        <div style={rowSt}>
+          <div style={labelSt}>상품명 <span style={{color:C.red}}>*</span></div>
+          <input value={form.name} onChange={e=>upd("name",e.target.value)} placeholder="예) 갑오징어/주꾸미" style={inputSt}/>
+        </div>
+
+        {/* 어종 */}
+        <div style={rowSt}>
+          <div style={labelSt}>어종 <span style={{color:C.red}}>*</span></div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {FISH_TAGS.map(f=><span key={f} onClick={()=>toggleFish(f)} style={chipSt(form.fishSpecies.includes(f))}>{f}</span>)}
+          </div>
+        </div>
+
+        {/* 최소/최대 인원 */}
+        <div style={rowSt}>
+          <div style={labelSt}>탑승 인원</div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:C.dimmed,marginBottom:4}}>최소 인원</div>
+              <input type="number" value={form.minPeople} onChange={e=>upd("minPeople",+e.target.value)} style={inputSt} min={1}/>
+            </div>
+            <span style={{color:C.dimmed,paddingTop:20}}>~</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:C.dimmed,marginBottom:4}}>최대 인원</div>
+              <input type="number" value={form.maxPeople} onChange={e=>upd("maxPeople",+e.target.value)} style={inputSt}/>
+            </div>
+          </div>
+        </div>
+
+        {/* 운영 기간 */}
+        <div style={rowSt}>
+          <div style={labelSt}>운영 기간 (MMDD)</div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <input value={form.sReleaseDt} onChange={e=>upd("sReleaseDt",e.target.value)} placeholder="0101" style={{...inputSt,flex:1}} maxLength={4}/>
+            <span style={{color:C.dimmed}}>~</span>
+            <input value={form.eReleaseDt} onChange={e=>upd("eReleaseDt",e.target.value)} placeholder="1231" style={{...inputSt,flex:1}} maxLength={4}/>
+          </div>
+          <div style={{fontSize:11,color:C.dimmed,marginTop:5}}>현재: {mmdd(form.sReleaseDt)} ~ {mmdd(form.eReleaseDt)}</div>
+        </div>
+
+        {/* 운영 요일 */}
+        <div style={rowSt}>
+          <div style={labelSt}>운영 요일</div>
+          <div style={{display:"flex",gap:6}}>
+            {WEEKS.map(w=><button key={w} onClick={()=>toggleWeek(w)} style={{flex:1,padding:"7px 0",border:`1.5px solid ${form.releaseWeek.includes(w)?C.blue:C.line2}`,borderRadius:7,background:form.releaseWeek.includes(w)?C.blueBg:C.white,color:form.releaseWeek.includes(w)?C.blue:C.desc,fontSize:12,fontWeight:700,cursor:"pointer"}}>{WEEK_KO[w]}</button>)}
+          </div>
+        </div>
+
+        {/* 출조/복귀 시간 */}
+        <div style={rowSt}>
+          <div style={labelSt}>출조/복귀 시간</div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <select value={form.sReleaseTime} onChange={e=>upd("sReleaseTime",e.target.value)} style={{...inputSt,flex:1}}>
+              {times.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+            <span style={{color:C.dimmed}}>~</span>
+            <select value={form.eReleaseTime} onChange={e=>upd("eReleaseTime",e.target.value)} style={{...inputSt,flex:1}}>
+              {times.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            {[["T","당일"],["N","익일"]].map(([v,l])=><button key={v} onClick={()=>upd("releaseDay",v)} style={{flex:1,padding:"7px",border:`1.5px solid ${form.releaseDay===v?C.blue:C.line2}`,borderRadius:7,background:form.releaseDay===v?C.blueBg:C.white,color:form.releaseDay===v?C.blue:C.desc,fontSize:12,fontWeight:700,cursor:"pointer"}}>{l} 복귀</button>)}
+          </div>
+        </div>
+
+        {/* 요금 */}
+        <div style={rowSt}>
+          <div style={labelSt}>요금 설정</div>
+          <div style={{background:C.bg3,borderRadius:10,padding:"14px"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>대인 평일</div>
+                <input type="number" value={form.adultRate} onChange={e=>upd("adultRate",+e.target.value)} placeholder="0" style={{...inputSt,fontSize:13}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>대인 주말</div>
+                <input type="number" value={form.adultWeekendRate} onChange={e=>upd("adultWeekendRate",+e.target.value)} placeholder="0" style={{...inputSt,fontSize:13}} disabled={!form.isWeekendRate}/>
+              </div>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                <Toggle value={form.isWeekendRate} onChange={v=>upd("isWeekendRate",v)} size="sm"/>
+                <span style={{fontSize:12,fontWeight:600,color:C.desc}}>주말 요금 별도 적용</span>
+              </label>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>소인 평일</div>
+                <input type="number" value={form.kidsRate} onChange={e=>upd("kidsRate",+e.target.value)} placeholder="0" style={{...inputSt,fontSize:13}} disabled={!form.isKidsRate}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.desc,marginBottom:4}}>소인 주말</div>
+                <input type="number" value={form.kidsWeekendRate} onChange={e=>upd("kidsWeekendRate",+e.target.value)} placeholder="0" style={{...inputSt,fontSize:13}} disabled={!form.isKidsRate||!form.isWeekendRate}/>
+              </div>
+            </div>
+            <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+              <Toggle value={form.isKidsRate} onChange={v=>upd("isKidsRate",v)} size="sm"/>
+              <span style={{fontSize:12,fontWeight:600,color:C.desc}}>소인 요금 사용</span>
+            </label>
+          </div>
+        </div>
+
+        {/* 자리 배정 */}
+        <div style={rowSt}>
+          <div style={labelSt}>자리 배정 방식</div>
+          <div style={{display:"flex",gap:8}}>
+            {[["D","추첨"],["R","지정"]].map(([v,l])=><button key={v} onClick={()=>upd("seatType",v)} style={{flex:1,padding:"9px",border:`1.5px solid ${form.seatType===v?C.blue:C.line2}`,borderRadius:8,background:form.seatType===v?C.blueBg:C.white,color:form.seatType===v?C.blue:C.desc,fontSize:13,fontWeight:700,cursor:"pointer"}}>{l}</button>)}
+          </div>
+        </div>
+
+        {/* 수수료 */}
+        <div style={rowSt}>
+          <div style={labelSt}>상품 수수료 (%)</div>
+          <input type="number" value={form.productsFee} onChange={e=>upd("productsFee",+e.target.value)} style={inputSt} min={0} max={100}/>
+        </div>
+
+        {/* 유의사항 */}
+        <div style={rowSt}>
+          <div style={labelSt}>유의사항</div>
+          <textarea value={form.notes} onChange={e=>upd("notes",e.target.value)} rows={3} placeholder="예약 전 확인할 내용을 입력해 주세요." style={{...inputSt,resize:"none",fontFamily:"inherit"}}/>
+        </div>
+
+      </div>
+      <div style={{position:"sticky",bottom:0,background:C.white,padding:"12px 20px 24px",borderTop:`1px solid ${C.line}`,display:"flex",gap:10}}>
+        <Btn label="취소" onClick={onClose} variant="line" full/>
+        <Btn label={isEdit?"수정 저장":"등록"} onClick={()=>onSave(form)} variant="primary" full/>
+      </div>
+    </div>
+  </div>;
+}
+
+/* 마스터상품 카드 */
+function MasterProductCard({master, onEdit, onDelete, dailyCount}){
+  const [open,setOpen]=useState(false);
+  const periodStr=`${String(master.sReleaseDt).padStart(4,"0").slice(0,2)}/${String(master.sReleaseDt).padStart(4,"0").slice(2)} ~ ${String(master.eReleaseDt).padStart(4,"0").slice(0,2)}/${String(master.eReleaseDt).padStart(4,"0").slice(2)}`;
+  const weekStr=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].filter(w=>master.releaseWeek.includes(w)).map(w=>WEEK_KO[w]).join("·");
+  return <div style={{background:C.white,borderRadius:12,marginBottom:10,overflow:"hidden",border:`1px solid ${C.line}`}}>
+    <div style={{padding:"14px 14px 10px"}}>
+      {/* 헤더 */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:15,color:C.black,letterSpacing:"-0.5px",marginBottom:4}}>{master.name}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {master.fishSpecies.map(f=><span key={f} style={{padding:"2px 7px",borderRadius:4,background:C.bg3,fontSize:11,color:C.desc,fontWeight:600}}>{f}</span>)}
+          </div>
+        </div>
+        <span style={{fontSize:11,color:C.blue,fontWeight:700,background:"#EBF0FF",padding:"3px 8px",borderRadius:4,flexShrink:0,marginLeft:8}}>출조일정 {dailyCount}건</span>
+      </div>
+      {/* 운영 정보 */}
+      <div style={{background:C.bg3,borderRadius:8,padding:"10px 12px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+        {[
+          ["운영 기간",periodStr],
+          ["운영 요일",weekStr||"-"],
+          ["출조 시간",`${master.sReleaseTime}~${master.eReleaseTime} (${master.releaseDay==="T"?"당일":"익일"})`],
+          ["대인 요금",`${master.adultRate.toLocaleString()}원${master.isWeekendRate?" / 주말 "+master.adultWeekendRate.toLocaleString()+"원":""}`],
+        ].map(([l,v])=><div key={l}>
+          <div style={{fontSize:10,color:C.dimmed,marginBottom:2}}>{l}</div>
+          <div style={{fontSize:11,fontWeight:600,color:C.black,letterSpacing:"-0.2px"}}>{v}</div>
+        </div>)}
+      </div>
+    </div>
+    {/* 액션 */}
+    <div style={{display:"flex",justifyContent:"space-around",padding:"8px 0 9px",borderTop:`1px solid ${C.line}`}}>
+      <button onClick={()=>onEdit(master)} style={{border:"none",background:"transparent",fontSize:12,fontWeight:600,color:C.desc,cursor:"pointer",padding:"2px 20px",letterSpacing:"-0.2px"}}>상품수정</button>
+      <button onClick={()=>onDelete(master)} style={{border:"none",background:"transparent",fontSize:12,fontWeight:600,color:C.red,cursor:"pointer",padding:"2px 20px",letterSpacing:"-0.2px"}}>상품삭제</button>
+    </div>
+  </div>;
+}
+
+/* 일자별상품 탭 (기존 ProductListScreen 로직) */
+function DailyProductTab({dailyProducts,setDailyProducts,masterProducts,addManualRsv,allRsvs}){
+  const [calYear,setCalYear]=useState(2026);
+  const [calMonth,setCalMonth]=useState(2);
+  const [selDate,setSelDate]=useState(null);
+  const [expanded,setExpanded]=useState({});
+  const [modal,setModal]=useState(null);
+  const [toast,setToast]=useState("");
+
+  const t2=m=>{setToast(m);setTimeout(()=>setToast(""),2200);};
+  const handleMonth=d=>{
+    if(d==="reset"){setCalYear(2026);setCalMonth(2);setSelDate(null);return;}
+    let m=calMonth+d,y=calYear;
+    if(m>12){m=1;y++;}if(m<1){m=12;y--;}setCalMonth(m);setCalYear(y);setSelDate(null);
+  };
+  const handleSelDate=d=>{setSelDate(d);if(d)setExpanded(prev=>({...prev,[d]:true}));};
+
+  const toggleDisplay=id=>{
+    setDailyProducts(p=>p.map(x=>x.id===id?{...x,bpiIsDisplay:!x.bpiIsDisplay}:x));
+    t2("노출 상태 변경됨");
+  };
+  const saveCapacity=(id,qty)=>{setDailyProducts(p=>p.map(x=>x.id===id?{...x,bpiQty:qty}:x));setModal(null);t2("판매 좌석 수 조정 완료");};
+  const quickSoldout=id=>{setDailyProducts(p=>p.map(x=>x.id===id?{...x,bpiQty:x.sold}:x));t2("즉시 마감 처리됨");};
+
+  const monthStr=`${calYear}-${String(calMonth).padStart(2,"0")}`;
+  const filtered=dailyProducts.filter(p=>selDate?p.date===selDate:p.date.startsWith(monthStr));
+  const grouped={};filtered.forEach(p=>{if(!grouped[p.date])grouped[p.date]=[];grouped[p.date].push(p);});
+
+  const labelStyle={fontSize:11,color:C.dimmed,letterSpacing:"-0.2px"};
+  const productDots=dailyProducts.filter(p=>p.date.startsWith(monthStr)&&p.bpiIsDisplay).map(p=>({date:p.date,label:""}));
+
+  return <div>
+    {/* 날짜 선택기 */}
+    <div style={{background:C.white,borderBottom:`1px solid ${C.line}`}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px 8px"}}>
+        <button onClick={()=>handleMonth(-1)} style={{border:"none",background:"transparent",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.desc,fontSize:18,fontWeight:700}}>‹</button>
+        <button onClick={()=>handleMonth("reset")} style={{fontWeight:700,fontSize:15,color:C.black,letterSpacing:"-0.5px",border:"none",background:"transparent",cursor:"pointer"}}>{calYear}년 {calMonth}월</button>
+        <button onClick={()=>handleMonth(1)} style={{border:"none",background:"transparent",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.desc,fontSize:18,fontWeight:700}}>›</button>
+      </div>
+      <div style={{display:"flex",gap:6,overflowX:"auto",padding:"0 16px 12px"}}>
+        <button onClick={()=>handleSelDate(null)} style={{flexShrink:0,padding:"5px 14px",borderRadius:50,border:`1.5px solid ${!selDate?C.blue:C.line2}`,background:!selDate?C.blue:C.white,color:!selDate?C.white:C.desc,fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"-0.2px"}}>전체</button>
+        {[...new Set(dailyProducts.filter(p=>p.date.startsWith(monthStr)).map(p=>p.date))].sort().map(d=>{
+          const dt=new Date(d);const day=dt.getDate();const dow=DAY_KO[dt.getDay()];
+          const sel=selDate===d;
+          return <button key={d} onClick={()=>handleSelDate(d)} style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"6px 12px",borderRadius:10,border:`1.5px solid ${sel?C.blue:C.line2}`,background:sel?C.blue:C.white,cursor:"pointer",gap:2}}>
+            <span style={{fontSize:10,color:sel?C.white:C.dimmed,fontWeight:600}}>{dow}</span>
+            <span style={{fontSize:15,fontWeight:800,color:sel?C.white:C.black,letterSpacing:"-0.5px"}}>{day}</span>
+          </button>;
+        })}
+      </div>
+    </div>
+
+    {/* 현황 요약 */}
+    <div style={{margin:"10px 16px",background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"12px 16px"}}>
+      <div style={{fontSize:11,color:C.dimmed,marginBottom:8,letterSpacing:"-0.2px"}}>
+        {selDate?`${selDate.replace(/-/g,".")} 일자별 현황`:`${calYear}년 ${calMonth}월 일자별 현황`}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:0}}>
+        {[
+          ["노출",filtered.filter(p=>p.bpiIsDisplay).length+"개",C.blue],
+          ["숨김",filtered.filter(p=>!p.bpiIsDisplay).length+"개",C.desc],
+          ["총 예약",filtered.reduce((s,p)=>s+p.sold,0)+"명",C.black],
+          ["잔여",filtered.reduce((s,p)=>s+p.sold,0)+"/"+filtered.reduce((s,p)=>s+p.bpiQty,0)+"석",C.green],
+        ].map(([l,v,c],i)=><div key={l} style={{textAlign:"center",borderRight:i<3?`1px solid ${C.line}`:"none"}}>
+          <div style={{...labelStyle,marginBottom:4}}>{l}</div>
+          <div style={{fontWeight:800,fontSize:18,color:c,letterSpacing:"-0.5px"}}>{v}</div>
+        </div>)}
+      </div>
+    </div>
+
+    {/* 일자별 카드 리스트 */}
+    {Object.keys(grouped).length===0&&<div style={{padding:"50px 0",textAlign:"center"}}>
+      <div style={{fontSize:36,marginBottom:12}}>📅</div>
+      <div style={{fontWeight:700,fontSize:14,color:C.desc,letterSpacing:"-0.3px"}}>해당 기간에 일자별 상품이 없습니다</div>
+      <div style={{fontSize:12,color:C.dimmed,marginTop:4}}>출조종류 등록 후 날짜별 출조가 자동 생성됩니다</div>
+    </div>}
+
+    <div style={{padding:"0 16px"}}>
+      {Object.entries(grouped).sort((a,b)=>a[0]>b[0]?1:-1).map(([date,ps])=>{
+        const open=expanded[date]!==false;
+        const displayCnt=ps.filter(p=>p.bpiIsDisplay).length;
+        const sold=ps.reduce((s,p)=>s+p.sold,0);
+        const cap=ps.reduce((s,p)=>s+p.bpiQty,0);
+        return <div key={date} style={{marginBottom:16}}>
+          {/* 날짜 헤더 */}
+          <button onClick={()=>setExpanded(prev=>({...prev,[date]:!open}))} style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",background:C.black,border:"none",borderRadius:open?"10px 10px 0 0":10,padding:"11px 14px",cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontWeight:700,fontSize:14,color:C.white,letterSpacing:"-0.5px"}}>{fmtDate(date)}</span>
+              <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>{ps.length}개</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,0.6)",letterSpacing:"-0.3px"}}>노출 {displayCnt} · 예약 {sold}/{cap}명</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                {open?<polyline points="18 15 12 9 6 15"/>:<polyline points="6 9 12 15 18 9"/>}
+              </svg>
+            </div>
+          </button>
+          {open&&<div style={{background:C.bg3,borderRadius:"0 0 12px 12px",padding:"8px 8px 4px"}}>
+            {ps.map(p=>{
+              const rem=p.bpiQty-p.sold;
+              const pct=Math.round(p.sold/Math.max(p.bpiQty,1)*100);
+              const rsvCount=(allRsvs||RESERVATIONS).filter(r=>r.prodId===p.id).length;
+              const master=masterProducts.find(m=>m.id===p.masterProductId);
+              return <div key={p.id} style={{background:C.white,borderRadius:12,marginBottom:8,overflow:"hidden",opacity:p.bpiIsException?0.55:1}}>
+                <div style={{padding:"13px 14px 10px"}}>
+                  {/* 노출토글 + 상태 + 제외뱃지 */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:9}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7}}>
+                      <Toggle value={p.bpiIsDisplay} onChange={()=>toggleDisplay(p.id)} size="sm"/>
+                      <span style={{fontSize:11,fontWeight:700,color:p.bpiIsDisplay?C.blue:C.desc,background:p.bpiIsDisplay?"#EBF0FF":C.bg3,padding:"3px 8px",borderRadius:4}}>
+                        {p.bpiIsDisplay?"노출중":"숨김"}
+                      </span>
+                      {p.bpiIsWeekendRate&&<span style={{fontSize:10,fontWeight:600,color:C.orange,background:"#FFF8E0",padding:"2px 6px",borderRadius:4}}>주말요금</span>}
+                    </div>
+                    {rem===0&&<span style={{fontSize:11,fontWeight:700,color:C.red,background:"#FFF0F0",padding:"3px 8px",borderRadius:4}}>매진</span>}
+                  </div>
+                  {/* 마스터상품 연결 태그 */}
+                  {master&&<div style={{fontSize:10,color:C.dimmed,marginBottom:5,letterSpacing:"-0.2px"}}>
+                    <span style={{background:C.bg3,padding:"2px 6px",borderRadius:4,fontWeight:600,color:C.desc}}>출조종류: {master.name}</span>
+                  </div>}
+                  {/* 상품명 + 요금 */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                    <div style={{fontWeight:700,fontSize:15,color:C.black,letterSpacing:"-0.5px",lineHeight:1.35,flex:1,marginRight:10}}>{p.bpiName}</div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontWeight:800,fontSize:16,color:C.blue,letterSpacing:"-0.5px"}}>{p.bpiAdultRate.toLocaleString()}원</div>
+                      <div style={{fontSize:10,color:C.dimmed,marginTop:1}}>대인 1인</div>
+                    </div>
+                  </div>
+                  {/* 어종 + 시간 */}
+                  <div style={{fontSize:11,color:C.desc,marginBottom:9,letterSpacing:"-0.2px"}}>
+                    {p.fishSpecies.join(" · ")} · {p.bpiSReleaseTime}~{p.bpiEReleaseTime} · {p.bpiReleaseDay==="T"?"당일":"익일"}
+                    {p.bpiIsKidsRate&&<span style={{marginLeft:4,color:C.dimmed}}>· 소인 {p.bpiKidsRate.toLocaleString()}원</span>}
+                  </div>
+                  {/* 예약/좌석 현황 */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:12}}>
+                    <span style={{color:C.desc}}>예약 <b style={{color:C.blue}}>{p.sold}</b>명 / 판매 {p.bpiQty}석</span>
+                    <span style={{fontWeight:700,color:rem===0?C.red:C.black,fontSize:12}}>{p.sold}/{p.bpiQty}석</span>
+                  </div>
+                  <div style={{height:3,borderRadius:2,background:C.bg3,overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:2,background:pct>=100?C.red:pct>=70?C.orange:C.blue,width:`${Math.min(pct,100)}%`,transition:"width .3s"}}/>
+                  </div>
+                </div>
+                {/* 1행: 인원조정 / 예약추가 / 예약명단 */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",borderTop:`1px solid ${C.line}`}}>
+                  {[
+                    {label:"인원조정",action:()=>setModal({type:"cap",product:{...p,id:p.id,capacity:p.bpiQty,sold:p.sold}}),color:C.black},
+                    {label:"예약추가",action:()=>setModal({type:"addRsv",product:{...p,id:p.id,name:p.bpiName,price:p.bpiAdultRate,capacity:p.bpiQty}}),color:C.blue},
+                    {label:rsvCount>0?`예약명단(${rsvCount})`:"예약명단",action:()=>setModal({type:"rsv",product:{...p,id:p.id,name:p.bpiName,price:p.bpiAdultRate,capacity:p.bpiQty,sold:p.sold,fish:p.fishSpecies,depart:p.bpiSReleaseTime,arrive:p.bpiEReleaseTime,type:p.bpiReleaseDay==="T"?"당일":"야간"}}),color:C.black},
+                  ].map(({label,action,color},i)=>(
+                    <button key={i} onClick={action} style={{padding:"10px 0",border:"none",background:C.bg1,fontSize:12,fontWeight:600,color,cursor:"pointer",borderRight:i<2?`1px solid ${C.line}`:"none",letterSpacing:"-0.3px"}}>{label}</button>
+                  ))}
+                </div>
+                {/* 2행: 개별수정 / 상품복사 - 텍스트만 */}
+                <div style={{display:"flex",justifyContent:"space-around",padding:"8px 0 9px"}}>
+                  <button onClick={()=>setModal({type:"editDaily",product:p})} style={{border:"none",background:"transparent",fontSize:12,fontWeight:500,color:C.desc,cursor:"pointer",padding:"2px 24px",letterSpacing:"-0.2px"}}>개별수정</button>
+                  <button onClick={()=>quickSoldout(p.id)} style={{border:"none",background:"transparent",fontSize:12,fontWeight:500,color:C.red,cursor:"pointer",padding:"2px 24px",letterSpacing:"-0.2px"}}>즉시마감</button>
+                </div>
+              </div>;
+            })}
+          </div>}
+        </div>;
+      })}
+    </div>
+
+    {/* 모달 */}
+    {modal?.type==="cap"&&<CapacityModal product={modal.product} onClose={()=>setModal(null)} onSave={cap=>saveCapacity(modal.product.id,cap)}/>}
+    {modal?.type==="rsv"&&<ReservationListModal product={modal.product} onClose={()=>setModal(null)}/>}
+    {modal?.type==="addRsv"&&<DirectReservationModal onClose={()=>setModal(null)} onSave={rsv=>{addManualRsv&&addManualRsv(rsv);setModal(null);t2("예약이 추가됐습니다");}} products={dailyProducts.map(d=>({id:d.id,name:d.bpiName,price:d.bpiAdultRate,capacity:d.bpiQty,sold:d.sold,date:d.date,depart:d.bpiSReleaseTime,arrive:d.bpiEReleaseTime,type:d.bpiReleaseDay==="T"?"당일":"야간",fish:d.fishSpecies,minBuy:1,memo:""}))} defaultProductId={modal.product?.id}/>}
+    {modal?.type==="editDaily"&&<DailyProductEditModal product={modal.product} onClose={()=>setModal(null)} onSave={edited=>{setDailyProducts(p=>p.map(x=>x.id===edited.id?{...x,...edited}:x));setModal(null);t2("개별 수정 완료");}}/>}
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* 상품관리 메인 (탭 전환) */
+function ProductListScreen({onRegister,products,setProducts,addManualRsv,allRsvs,masterProducts,setMasterProducts,dailyProducts,setDailyProducts,selectedBoatId,onSelectBoat}){
+  const [tab,setTab]=useState("daily"); // "master" | "daily"
+  const [modal,setModal]=useState(null);
+  const [confirm,setConfirm]=useState(null);
+  const [toast,setToast]=useState("");
+  const t2=m=>{setToast(m);setTimeout(()=>setToast(""),2200);};
+
+  const handleSaveMaster=form=>{
+    if(modal?.type==="editMaster"){
+      setMasterProducts(p=>p.map(x=>x.id===form.id?{...x,...form}:x));
+      t2("출조종류 수정 완료");
+    } else {
+      const newM={...form,id:nextMasterId++,boatIdx:1};
+      setMasterProducts(p=>[...p,newM]);
+      t2("출조종류 등록 완료");
+    }
+    setModal(null);
+  };
+  const handleDeleteMaster=master=>{
+    setConfirm({
+      title:"출조종류 삭제",
+      msg:`'${master.name}'를 삭제합니다.\n연결된 날짜별 출조도 함께 삭제됩니다.`,
+      onOk:()=>{
+        setMasterProducts(p=>p.filter(x=>x.id!==master.id));
+        setDailyProducts(p=>p.filter(x=>x.masterProductId!==master.id));
+        setConfirm(null);t2("출조종류 삭제됨");
+      }
+    });
+  };
+
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:70,background:C.bg2}}>
+    <AppHeader title="상품관리" dot={true}/>
+    <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
+
+    {/* 탭 */}
+    <div style={{display:"flex",background:C.white,borderBottom:`1px solid ${C.line}`,padding:"0 16px",gap:0}}>
+      {[["daily","일자별상품"],["master","출조종류 관리"]].map(([k,l])=>(
+        <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"13px 0",border:"none",background:"transparent",fontWeight:tab===k?700:500,fontSize:14,color:tab===k?C.blue:C.desc,cursor:"pointer",borderBottom:tab===k?`2.5px solid ${C.blue}`:"2.5px solid transparent",letterSpacing:"-0.3px",marginBottom:-1}}>{l}</button>
+      ))}
+    </div>
+
+    {/* 탭별 콘텐츠 */}
+    {tab==="daily"&&<DailyProductTab
+      dailyProducts={dailyProducts} setDailyProducts={setDailyProducts}
+      masterProducts={masterProducts} addManualRsv={addManualRsv} allRsvs={allRsvs}
+    />}
+
+    {tab==="master"&&<div style={{padding:"14px 16px"}}>
+      {/* 마스터상품 안내 */}
+      <div style={{background:"#EBF0FF",borderRadius:10,padding:"11px 14px",marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:12,color:C.blue,marginBottom:3,letterSpacing:"-0.3px"}}>출조종류 관리란?</div>
+        <div style={{fontSize:12,color:"#3366CC",lineHeight:1.6,letterSpacing:"-0.2px"}}>출조상품의 종류·운영기간·요금을 등록합니다.<br/>등록한 종류 기준으로 날짜별 출조가 자동 생성됩니다.</div>
+      </div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+        <button onClick={()=>setModal({type:"addMaster"})} style={{padding:"9px 18px",border:"none",borderRadius:9,background:C.blue,color:C.white,fontWeight:700,fontSize:13,cursor:"pointer",letterSpacing:"-0.3px"}}>+ 출조종류 등록</button>
+      </div>
+      {masterProducts.length===0&&<div style={{padding:"40px 0",textAlign:"center"}}>
+        <div style={{fontSize:36,marginBottom:10}}>📋</div>
+        <div style={{fontWeight:700,fontSize:14,color:C.desc}}>등록된 출조종류가 없습니다</div>
+      </div>}
+      {masterProducts.map(m=>(
+        <MasterProductCard key={m.id} master={m}
+          dailyCount={dailyProducts.filter(d=>d.masterProductId===m.id).length}
+          onEdit={m=>setModal({type:"editMaster",master:m})}
+          onDelete={handleDeleteMaster}
+        />
+      ))}
+    </div>}
+
+    {(modal?.type==="addMaster"||modal?.type==="editMaster")&&
+      <MasterProductModal master={modal.master} onClose={()=>setModal(null)} onSave={handleSaveMaster}/>}
+    {confirm&&<Confirm title={confirm.title} msg={confirm.msg} onOk={confirm.onOk} onCancel={()=>setConfirm(null)}/>}
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* ─── BULK EDIT ─────────────── */
+function BulkEditScreen({onBack,products,setProducts}){
+  const [days,setDays]=useState([]);
+  const [selProds,setSelProds]=useState([]);
+  const [dropOpen,setDropOpen]=useState(false);
+  const [newStatus,setNewStatus]=useState("");
+  const [newCap,setNewCap]=useState("");
+  const [toast,setToast]=useState("");
+  const dArr=["일","월","화","수","목","금","토"];
+  const toggleDay=d=>{if(d==="전체")setDays(days.length===7?[]:dArr);else setDays(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);};
+  const toggleProd=n=>setSelProds(p=>p.includes(n)?p.filter(x=>x!==n):[...p,n]);
+  const pNames=[...new Set(products.map(p=>p.name))];
+  const apply=()=>{
+    if(!newStatus&&!newCap){return;}
+    setProducts(prev=>prev.map(p=>{
+      if(selProds.length>0&&!selProds.includes(p.name))return p;
+      const dow=DAY_KO[new Date(p.date).getDay()];
+      if(days.length>0&&!days.includes(dow))return p;
+      return{...p,...(newStatus?{status:newStatus}:{}),...(newCap?{capacity:Math.max(p.sold,parseInt(newCap))}:{})};
+    }));
+    setToast("일괄 수정 완료");
+    setTimeout(onBack,1600);
+  };
+  const labelStyle={fontWeight:700,fontSize:14,marginBottom:10,letterSpacing:"-0.5px",color:C.black,paddingBottom:8,borderBottom:`1.5px solid ${C.line}`};
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:80,background:C.bg2}}>
+    <AppHeader title="상품 일괄수정" onBack={onBack}/>
+    <div style={{padding:16}}>
+      <div style={{background:"#FFF8E0",borderRadius:10,border:`1px solid #FFE580`,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#8A6400",lineHeight:1.6,letterSpacing:"-0.2px"}}>
+        ⚠ 아래 조건에 해당하는 상품이 모두 수정됩니다.<br/>날짜·요일·상품명 미선택 시 전체 상품에 적용됩니다.
+      </div>
+
+      <div style={{marginBottom:20}}>
+        <div style={labelStyle}>📅 날짜 범위</div>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          {["시작일","종료일"].map((pl,i)=><input key={i} defaultValue={i===0?"2026.02.01":"2026.02.28"} style={{flex:1,border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:13,background:C.white,letterSpacing:"-0.2px"}}/>)}
+        </div>
+        <div style={{fontSize:11,color:C.desc,marginBottom:8,letterSpacing:"-0.2px"}}>요일 선택 (미선택 시 전체)</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+          {["전체",...dArr].map(d=>{const a=d==="전체"?days.length===7:days.includes(d);return <button key={d} onClick={()=>toggleDay(d)} style={{padding:"9px 0",border:`1.5px solid`,borderColor:a?C.blue:C.line,borderRadius:8,background:a?C.blueBg:C.white,color:a?C.blue:C.desc,fontSize:13,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px"}}>{d}</button>;})}
+        </div>
+      </div>
+
+      <div style={{marginBottom:20}}>
+        <div style={labelStyle}>🛍 상품 선택</div>
+        <div style={{position:"relative"}}>
+          <button onClick={()=>setDropOpen(!dropOpen)} style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"11px 14px",background:C.white,fontSize:13,color:selProds.length>0?C.black:C.dimmed,cursor:"pointer",letterSpacing:"-0.2px"}}>
+            <span>{selProds.length>0?`${selProds.length}개 선택됨`:"전체 상품"}</span>
+            <span style={{color:C.dimmed,fontSize:12}}>{dropOpen?"▲":"▼"}</span>
+          </button>
+          {dropOpen&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:C.white,border:`1px solid ${C.line}`,borderRadius:8,boxShadow:"0 4px 20px rgba(0,0,0,.1)",zIndex:50,maxHeight:180,overflowY:"auto",marginTop:4}}>
+            {pNames.map(name=><button key={name} onClick={()=>toggleProd(name)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 14px",border:"none",background:C.white,borderBottom:`1px solid ${C.line}`,fontSize:13,color:C.black,cursor:"pointer",letterSpacing:"-0.2px"}}>
+              <div style={{width:18,height:18,borderRadius:4,border:`1.5px solid`,borderColor:selProds.includes(name)?C.blue:C.line2,background:selProds.includes(name)?C.blue:C.white,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:C.white,fontWeight:700}}>{selProds.includes(name)?"✓":""}</div>
+              <span>{name}</span>
+            </button>)}
+          </div>}
+        </div>
+      </div>
+
+      <div style={{marginBottom:24}}>
+        <div style={labelStyle}>⚙ 변경 내용</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div>
+            <div style={{fontSize:12,color:C.desc,marginBottom:8,fontWeight:600,letterSpacing:"-0.2px"}}>판매 상태</div>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {[["selling","판매중",C.blue],["stop","판매중지",C.desc],["마감","즉시마감",C.red]].map(([v,l,c])=><button key={v} onClick={()=>setNewStatus(s=>s===v?"":v)} style={{padding:"10px",border:`1.5px solid`,borderColor:newStatus===v?c:C.line,borderRadius:8,background:newStatus===v?c:C.white,color:newStatus===v?C.white:C.desc,fontSize:13,fontWeight:700,cursor:"pointer",letterSpacing:"-0.2px"}}>{l}</button>)}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:12,color:C.desc,marginBottom:8,fontWeight:600,letterSpacing:"-0.2px"}}>예약 정원</div>
+            <input value={newCap} onChange={e=>setNewCap(e.target.value)} placeholder="직접입력" type="number" style={{width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,marginBottom:8,letterSpacing:"-0.2px"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
+              {[5,8,10,11,15,20].map(n=><button key={n} onClick={()=>setNewCap(String(n))} style={{padding:"7px",border:`1.5px solid`,borderColor:newCap===String(n)?C.blue:C.line,borderRadius:7,background:newCap===String(n)?C.blueBg:C.white,color:newCap===String(n)?C.blue:C.desc,fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:"-0.2px"}}>{n}</button>)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <Btn label="취소" onClick={onBack} variant="line"/>
+        <Btn label="일괄 수정 적용" onClick={apply} variant="primary"/>
+      </div>
+    </div>
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* ─── PRODUCT REGISTER ──────── */
+function ProductRegisterScreen({onBack}){
+  const [regType,setRegType]=useState("하루");
+  const [status,setStatus]=useState("selling");
+  const [fish,setFish]=useState([]);
+  const [toast,setToast]=useState("");
+  const toggle=f=>setFish(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f]);
+  const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
+  const labelStyle={fontSize:12,color:C.desc,fontWeight:600,marginBottom:5,letterSpacing:"-0.2px"};
+  const register=()=>{setToast("상품이 등록되었습니다");setTimeout(onBack,1500);};
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:100,background:C.bg2}}>
+    <AppHeader title="상품 등록" onBack={onBack}/>
+
+    <div style={{margin:"12px 16px 0",display:"grid",gridTemplateColumns:"1fr 1fr",border:`1.5px solid ${C.line2}`,borderRadius:10,overflow:"hidden",background:C.white}}>
+      {["하루 상품","여러날 상품"].map((t,i)=><button key={t} onClick={()=>setRegType(i===0?"하루":"여러날")} style={{padding:"12px 0",border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:(i===0?regType==="하루":regType==="여러날")?C.blue:C.white,color:(i===0?regType==="하루":regType==="여러날")?C.white:C.dimmed,letterSpacing:"-0.3px"}}>{t}</button>)}
+    </div>
+
+    <div style={{padding:"16px 16px 0"}}>
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"16px",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:14,letterSpacing:"-0.5px",color:C.black}}>기본 정보</div>
+        <div style={{marginBottom:12}}>
+          <div style={labelStyle}>상품명 <span style={{color:C.red}}>*</span></div>
+          <input placeholder="예) 영흥도 광어낚시" style={inputStyle}/>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          <div><div style={labelStyle}>상품종류 <span style={{color:C.red}}>*</span></div>
+            <select style={{...inputStyle,color:C.black}}><option>당일</option><option>1박2일</option><option>야간</option></select>
+          </div>
+          <div><div style={labelStyle}>판매가격 <span style={{color:C.red}}>*</span></div>
+            <input placeholder="94000" type="number" style={inputStyle}/>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {[["총 정원 *","11"],["최소구매","1"],["예약금","0"]].map(([l,v])=><div key={l}><div style={labelStyle}>{l}</div><input defaultValue={v} type="number" style={inputStyle}/></div>)}
+        </div>
+      </div>
+
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"16px",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:14,letterSpacing:"-0.5px",color:C.black}}>출항 정보</div>
+        {regType==="하루"&&<div style={{marginBottom:10}}><div style={labelStyle}>출항일 <span style={{color:C.red}}>*</span></div><input defaultValue="2026.03.01" style={inputStyle}/></div>}
+        {regType==="여러날"&&<div style={{marginBottom:10}}>
+          <div style={labelStyle}>등록 기간 <span style={{color:C.red}}>*</span></div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input defaultValue="2026.03.01" style={{...inputStyle,flex:1}}/>
+            <span style={{color:C.dimmed,flexShrink:0}}>~</span>
+            <input defaultValue="2026.03.31" style={{...inputStyle,flex:1}}/>
+          </div>
+          <div style={{fontSize:11,color:C.dimmed,marginTop:5,letterSpacing:"-0.2px"}}>최대 1년치 일괄 등록 가능합니다.</div>
+        </div>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[["출항시간 *","05:00"],["입항시간 *","15:30"]].map(([l,v])=><div key={l}><div style={labelStyle}>{l}</div><input defaultValue={v} style={inputStyle}/></div>)}
+        </div>
+      </div>
+
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"16px",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12,letterSpacing:"-0.5px",color:C.black}}>어종 선택</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {FISH_TAGS.map(f=><button key={f} onClick={()=>toggle(f)} style={{padding:"6px 12px",borderRadius:50,border:`1.5px solid`,borderColor:fish.includes(f)?C.blue:C.line,background:fish.includes(f)?C.blueBg:C.white,color:fish.includes(f)?C.blue:C.desc,fontSize:12,cursor:"pointer",fontWeight:fish.includes(f)?700:400,letterSpacing:"-0.2px"}}>{f}</button>)}
+        </div>
+      </div>
+
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"16px",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12,letterSpacing:"-0.5px",color:C.black}}>옵션 설정</div>
+        <button style={{width:"100%",padding:"11px",border:`1.5px dashed #A0BCFF`,borderRadius:8,background:C.blueBg,color:C.blue,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:8,letterSpacing:"-0.3px"}}>+ 필수옵션 추가</button>
+        <button style={{width:"100%",padding:"11px",border:`1.5px dashed ${C.line2}`,borderRadius:8,background:C.bg1,color:C.desc,fontSize:13,fontWeight:600,cursor:"pointer",letterSpacing:"-0.3px"}}>+ 추가옵션 추가</button>
+      </div>
+
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"16px",marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10,letterSpacing:"-0.5px",color:C.black}}>메모 (선주님만 보임)</div>
+        <textarea placeholder="미끼 종류, 특이사항 등 내부 메모를 입력해 주세요." rows={2} style={{...inputStyle,resize:"none",fontFamily:"inherit"}}/>
+      </div>
+
+      <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,padding:"16px",marginBottom:20}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12,letterSpacing:"-0.5px",color:C.black}}>판매 상태</div>
+        <div style={{display:"flex",gap:8}}>
+          {[["selling","바로 판매 시작",C.blue],["stop","임시 저장",C.desc]].map(([s,l,c])=><button key={s} onClick={()=>setStatus(s)} style={{flex:1,padding:"12px",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14,background:status===s?c:C.bg3,color:status===s?C.white:C.dimmed,letterSpacing:"-0.3px"}}>{l}</button>)}
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingBottom:20}}>
+        <Btn label="취소" onClick={onBack} variant="line"/>
+        <Btn label="등록하기" onClick={register} variant="primary" size="lg"/>
+      </div>
+    </div>
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* ═══ FISHING REPORT ═══ */
+function FishingReportScreen({onAdd,selectedBoatId,onSelectBoat}){
+  const [reports,setReports]=useState(FISHING_REPORTS);
+  const [confirm,setConfirm]=useState(null);
+  const del=id=>{setReports(p=>p.filter(x=>x.id!==id));setConfirm(null);};
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:130,background:C.bg2}}>
+    <AppHeader title="조황관리"/>
+    <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
+    <div style={{padding:"0 16px 10px"}}>
+      <input placeholder="조황 내용이나 제목을 검색해 주세요." style={{width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 14px",fontSize:13,background:C.white,letterSpacing:"-0.2px"}}/>
+    </div>
+    <div style={{padding:"0 16px",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <span style={{fontWeight:700,fontSize:14,letterSpacing:"-0.5px"}}>조황 {reports.length}개</span>
+      <div style={{display:"flex",gap:6}}>
+        <button style={{border:`1px solid ${C.line}`,borderRadius:6,padding:"5px 10px",fontSize:12,background:C.white,cursor:"pointer",color:C.desc,letterSpacing:"-0.2px"}}>필터</button>
+        <button style={{border:`1px solid ${C.line}`,borderRadius:6,padding:"5px 10px",fontSize:12,background:C.white,cursor:"pointer",color:C.desc,letterSpacing:"-0.2px"}}>최신순 ↑</button>
+      </div>
+    </div>
+    <div style={{padding:"0 16px"}}>
+      {reports.map((r,i)=><div key={r.id} style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,marginBottom:10,overflow:"hidden"}}>
+        <div style={{padding:"13px 14px"}}>
+          <div style={{display:"flex",gap:12,marginBottom:10,alignItems:"flex-start"}}>
+            <div style={{width:60,height:60,borderRadius:10,background:C.bg3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,flexShrink:0}}>{r.img}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:14,color:C.black,letterSpacing:"-0.5px",lineHeight:1.3}}>{r.title||"(제목 없음)"}</div>
+              <div style={{fontSize:12,color:C.desc,marginTop:3,letterSpacing:"-0.2px"}}>{r.fish?.join(" · ")||"(어종 없음)"}</div>
+              <div style={{fontSize:11,color:C.dimmed,marginTop:3,letterSpacing:"-0.2px"}}>{r.date} · 조회 {r.views}</div>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+            {[["미리보기",C.bg3,C.black],["수정",C.blueBg,C.blue],["삭제","#FFF0F0",C.red]].map(([l,bg,c],i)=><button key={l} onClick={i===2?()=>setConfirm({msg:`"${r.title||"이 조황"}"을\n삭제할까요?`,onOk:()=>del(r.id)}):undefined} style={{padding:"8px",border:"none",borderRadius:7,background:bg,fontSize:12,fontWeight:700,cursor:"pointer",color:c,letterSpacing:"-0.2px"}}>{l}</button>)}
+          </div>
+        </div>
+      </div>)}
+    </div>
+    <div style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",width:390,padding:"0 16px",boxSizing:"border-box"}}>
+      <button onClick={onAdd} style={{width:"100%",padding:"14px",background:C.black,color:C.white,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px",boxShadow:"0 4px 20px rgba(0,0,0,.2)"}}>🐟 조황 등록 +</button>
+    </div>
+    {confirm&&<Confirm title="조황 삭제" msg={confirm.msg} onOk={confirm.onOk} onCancel={()=>setConfirm(null)}/>}
+  </div>;
+}
+
+function FishingModal({onClose}){
+  const [selDate,setSelDate]=useState("2026-02-28");
+  const [fish,setFish]=useState([]);
+  const [toast,setToast]=useState("");
+  const toggle=f=>setFish(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f]);
+  const register=()=>{setToast("조황이 등록되었습니다");setTimeout(onClose,1500);};
+  const labelStyle={fontWeight:600,fontSize:13,marginBottom:7,letterSpacing:"-0.3px",color:C.black};
+  const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
+  return <div style={{position:"fixed",inset:0,background:C.white,zIndex:300,overflowY:"auto"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px",height:54,borderBottom:`1px solid ${C.line}`,position:"sticky",top:0,background:C.white,zIndex:1}}>
+      <span style={{fontWeight:700,fontSize:17,letterSpacing:"-0.5px"}}>조황 등록</span>
+      <button onClick={onClose} style={{border:"none",background:"transparent",fontSize:20,cursor:"pointer",color:C.dimmed}}>✕</button>
+    </div>
+    <div style={{padding:"0 20px"}}>
+      <div style={{marginTop:16,marginBottom:12}}>
+        <div style={labelStyle}>조황 날짜</div>
+        <MiniCalendar year={2026} month={2} onMonth={()=>{}} dotDates={[{date:"2026-02-20",label:""},{date:"2026-02-26",label:""}]} selectedDate={selDate} onSelect={setSelDate}/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+          <div style={labelStyle}>조황 이미지</div>
+          <span style={{fontSize:11,color:C.dimmed}}>최대 30장</span>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {[0,1,2].map(i=><div key={i} style={{width:72,height:72,border:`1.5px dashed ${C.line2}`,borderRadius:10,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",background:C.bg1}}>
+            <span style={{fontSize:22}}>📷</span><span style={{fontSize:9,color:C.dimmed,marginTop:3,letterSpacing:"-0.2px"}}>추가</span>
+          </div>)}
+        </div>
+      </div>
+      <div style={{marginBottom:14}}><div style={labelStyle}>조황 제목 <span style={{color:C.red}}>*</span></div><input placeholder="예) 2월 4주차 광어 조황 (최대 20자)" style={inputStyle}/></div>
+      <div style={{marginBottom:14}}>
+        <div style={labelStyle}>어종 선택 <span style={{color:C.red}}>*</span></div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {FISH_TAGS.map(f=><button key={f} onClick={()=>toggle(f)} style={{padding:"5px 11px",borderRadius:50,border:`1.5px solid`,borderColor:fish.includes(f)?C.blue:C.line,background:fish.includes(f)?C.blueBg:C.white,color:fish.includes(f)?C.blue:C.desc,fontSize:12,cursor:"pointer",fontWeight:fish.includes(f)?700:400,letterSpacing:"-0.2px"}}>{f}</button>)}
+        </div>
+      </div>
+      <div style={{marginBottom:20}}><div style={labelStyle}>조황 내용</div><textarea placeholder="조황 내용을 자유롭게 입력해 주세요." rows={4} style={{...inputStyle,resize:"none",fontFamily:"inherit"}}/></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,paddingBottom:32}}>
+        <Btn label="취소" onClick={onClose} variant="line"/>
+        <Btn label="조황등록" onClick={register} variant="primary"/>
+      </div>
+    </div>
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* ═══ NOTICE ═══ */
+function NoticeScreen({selectedBoatId,onSelectBoat}){
+  const [notices,setNotices]=useState([]);
+  const [adding,setAdding]=useState(false);
+  const [title,setTitle]=useState("");const [body,setBody]=useState("");
+  const [toast,setToast]=useState("");
+  const add=()=>{if(!title.trim())return;setNotices(p=>[{id:Date.now(),title,body,date:"2026.02.28",views:0},...p]);setTitle("");setBody("");setAdding(false);setToast("공지가 등록됐습니다");};
+  const inputStyle={width:"100%",border:`1.5px solid ${C.line2}`,borderRadius:8,padding:"10px 12px",fontSize:14,background:C.white,letterSpacing:"-0.2px"};
+  return <div style={{flex:1,overflowY:"auto",paddingBottom:130,background:C.bg2}}>
+    <AppHeader title="공지관리"/>
+    <BoatSelector selectedBoatId={selectedBoatId} onSelect={onSelectBoat}/>
+    <div style={{padding:"0 16px"}}>
+      {notices.length===0&&<div style={{padding:"70px 0",textAlign:"center"}}>
+        <div style={{fontSize:52,marginBottom:12}}>📢</div>
+        <div style={{fontWeight:700,fontSize:16,color:C.desc,letterSpacing:"-0.5px"}}>등록된 공지가 없습니다</div>
+        <div style={{fontSize:13,color:C.dimmed,marginTop:4,letterSpacing:"-0.2px"}}>공지를 등록해 탑승객에게 알려보세요.</div>
+      </div>}
+      {notices.map((n)=><div key={n.id} style={{background:C.white,borderRadius:12,border:`1px solid ${C.line}`,marginBottom:10,overflow:"hidden"}}>
+        <div style={{padding:"13px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+            <div style={{fontWeight:700,fontSize:14,flex:1,marginRight:8,letterSpacing:"-0.5px"}}>{n.title}</div>
+            <span style={{fontSize:11,color:C.dimmed,flexShrink:0,letterSpacing:"-0.2px"}}>조회 {n.views}</span>
+          </div>
+          <div style={{fontSize:11,color:C.dimmed,marginBottom:8,letterSpacing:"-0.2px"}}>{n.date}</div>
+          {n.body&&<div style={{fontSize:13,color:C.desc,lineHeight:1.6,marginBottom:10,letterSpacing:"-0.2px"}}>{n.body}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            <button style={{padding:"8px",border:`1px solid ${C.line}`,borderRadius:7,fontSize:12,fontWeight:600,cursor:"pointer",color:C.black,background:C.bg1,letterSpacing:"-0.2px"}}>수정</button>
+            <button onClick={()=>setNotices(p=>p.filter(x=>x.id!==n.id))} style={{padding:"8px",border:`1px solid #FFD0D0`,borderRadius:7,fontSize:12,fontWeight:700,cursor:"pointer",color:C.red,background:"#FFF5F5",letterSpacing:"-0.2px"}}>삭제</button>
+          </div>
+        </div>
+      </div>)}
+    </div>
+    {adding&&<BottomSheet title="공지 등록" onClose={()=>setAdding(false)}>
+      <div style={{padding:"16px 20px 32px"}}>
+        <div style={{marginBottom:12}}><div style={{fontSize:12,color:C.desc,fontWeight:600,marginBottom:5,letterSpacing:"-0.2px"}}>제목 <span style={{color:C.red}}>*</span></div><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="공지 제목을 입력해 주세요." style={inputStyle}/></div>
+        <div style={{marginBottom:20}}><div style={{fontSize:12,color:C.desc,fontWeight:600,marginBottom:5,letterSpacing:"-0.2px"}}>내용</div><textarea value={body} onChange={e=>setBody(e.target.value)} rows={4} placeholder="공지 내용을 입력해 주세요." style={{...inputStyle,resize:"none",fontFamily:"inherit"}}/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <Btn label="취소" onClick={()=>setAdding(false)} variant="line"/>
+          <Btn label="등록" onClick={add} variant="primary"/>
+        </div>
+      </div>
+    </BottomSheet>}
+    <div style={{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",width:390,padding:"0 16px",boxSizing:"border-box"}}>
+      <button onClick={()=>setAdding(true)} style={{width:"100%",padding:"14px",background:C.blue,color:C.white,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",letterSpacing:"-0.3px"}}>공지 등록하기 +</button>
+    </div>
+    {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+  </div>;
+}
+
+/* ═══ APP ROOT ═══ */
+/* ═══ FEEDBACK PANEL ═══ */
+const SCREEN_LABELS={home:"홈",settlement:"정산",settlementDetail:"정산 상세",reservation:"예약관리",product:"상품관리",fishing:"출조보고",notice:"공지사항"};
+const SCREEN_KEYS=["home","reservation","product","settlement","fishing","notice","settlementDetail"];
+
+function FeedbackPanel({screen}){
+  const [open,setOpen]=useState(true); // 기본 펼침
+  const [comments,setComments]=useState({});     // {screenKey:[{id,author,text,ts,editing}]}
+  const [draft,setDraft]=useState({author:"",text:""});
+  const [editDraft,setEditDraft]=useState({});   // {id:{author,text}}
+  const textRef=useRef(null);
+
+  const screenComments=comments[screen]||[];
+  const count=Object.values(comments).reduce((s,arr)=>s+(arr||[]).length,0);
+
+  const addComment=()=>{
+    if(!draft.text.trim())return;
+    const name=draft.author.trim()||"익명";
+    const ts=new Date().toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).replace(/\. /g,".").replace(",","");
+    const newC={id:Date.now(),author:name,text:draft.text.trim(),ts,editing:false};
+    setComments(c=>({...c,[screen]:[newC,...(c[screen]||[])]}));
+    setDraft(d=>({...d,text:""}));
+    if(textRef.current)textRef.current.focus();
+  };
+  const deleteComment=(id)=>{
+    setComments(c=>({...c,[screen]:(c[screen]||[]).filter(x=>x.id!==id)}));
+  };
+  const startEdit=(c)=>{
+    setEditDraft(d=>({...d,[c.id]:{author:c.author,text:c.text}}));
+    setComments(cs=>({...cs,[screen]:(cs[screen]||[]).map(x=>x.id===c.id?{...x,editing:true}:x)}));
+  };
+  const saveEdit=(id)=>{
+    const d=editDraft[id];
+    if(!d||!d.text.trim())return;
+    setComments(cs=>({...cs,[screen]:(cs[screen]||[]).map(x=>x.id===id?{...x,author:d.author||"익명",text:d.text.trim(),editing:false,edited:true}:x)}));
+  };
+  const cancelEdit=(id)=>{
+    setComments(cs=>({...cs,[screen]:(cs[screen]||[]).map(x=>x.id===id?{...x,editing:false}:x)}));
+  };
+
+  const panelBg="#F8F9FF";
+  const border="#E4E8FF";
+  const accent="#0041FF";
+  const tagColors=["#EBF0FF","#E8FFF3","#FFF8E0","#FFE8E8","#F5E8FF","#E8F8FF","#F0FFE8"];
+  const tagTextColors=[accent,"#00875A","#996600","#CC0000","#6600CC","#0077CC","#2D8000"];
+
+  return <div style={{display:"flex",flexDirection:"column",width:open?340:48,transition:"width .25s cubic-bezier(.16,1,.3,1)",flexShrink:0,position:"sticky",top:0,height:"100vh",alignSelf:"flex-start"}}>
+    {/* 토글 탭 */}
+    <button onClick={()=>setOpen(o=>!o)} title={open?"의견 패널 닫기":"의견 패널 열기"}
+      style={{position:"absolute",left:-1,top:20,width:24,height:56,background:accent,border:"none",borderRadius:"8px 0 0 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,zIndex:10,boxShadow:"-2px 0 8px rgba(0,65,255,.15)"}}>
+      <div style={{width:2,height:12,background:"rgba(255,255,255,.9)",borderRadius:1,transform:open?"rotate(30deg)":"rotate(-30deg)",transformOrigin:"center",transition:"transform .2s"}}/>
+      <div style={{width:2,height:12,background:"rgba(255,255,255,.9)",borderRadius:1,transform:open?"rotate(-30deg)":"rotate(30deg)",transformOrigin:"center",transition:"transform .2s"}}/>
+      {!open&&count>0&&<div style={{position:"absolute",top:-6,right:-4,background:"#FF3B3B",borderRadius:10,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",padding:"0 3px"}}>{count}</div>}
+    </button>
+
+    {open&&<div style={{flex:1,display:"flex",flexDirection:"column",background:panelBg,borderLeft:`1.5px solid ${border}`,height:"100vh",overflowY:"hidden"}}>
+      {/* 헤더 */}
+      <div style={{padding:"16px 16px 12px",borderBottom:`1px solid ${border}`,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:24,height:24,background:accent,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <span style={{fontWeight:700,fontSize:13,letterSpacing:"-0.3px",color:"#1a1a2e"}}>프로토타입 의견</span>
+            {count>0&&<span style={{background:accent,color:"#fff",fontSize:10,fontWeight:700,borderRadius:10,padding:"1px 7px"}}>{count}</span>}
+          </div>
+        </div>
+        {/* 화면 탭 */}
+        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+          {SCREEN_KEYS.map((k,i)=>{
+            const cnt=(comments[k]||[]).length;
+            const active=screen===k;
+            return <div key={k} style={{padding:"4px 9px",borderRadius:20,fontSize:11,fontWeight:active?700:500,letterSpacing:"-0.2px",background:active?accent:cnt>0?"#EBF0FF":"#EDEDF0",color:active?"#fff":cnt>0?accent:"#888",cursor:"default",display:"flex",alignItems:"center",gap:3}}>
+              {SCREEN_LABELS[k]}
+              {cnt>0&&<span style={{fontSize:10,fontWeight:700,color:active?"rgba(255,255,255,.85)":accent}}>{cnt}</span>}
+            </div>;
+          })}
+        </div>
+      </div>
+
+      {/* 현재 화면 레이블 */}
+      <div style={{padding:"10px 16px 0",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:3,height:14,background:accent,borderRadius:2}}/>
+          <span style={{fontWeight:700,fontSize:13,color:accent,letterSpacing:"-0.3px"}}>{SCREEN_LABELS[screen]||screen} 화면</span>
+          {screenComments.length>0&&<span style={{fontSize:11,color:"#888"}}>{screenComments.length}개</span>}
+        </div>
+      </div>
+
+      {/* 댓글 목록 */}
+      <div style={{flex:1,overflowY:"auto",padding:"10px 12px",display:"flex",flexDirection:"column",gap:8}}>
+        {screenComments.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:"#aaa"}}>
+          <div style={{fontSize:28,marginBottom:8}}>💬</div>
+          <div style={{fontSize:12,letterSpacing:"-0.2px",lineHeight:1.6}}>이 화면에 대한 의견을 남겨보세요</div>
+        </div>}
+        {screenComments.map((c,i)=>{
+          const ci=i%tagColors.length;
+          return <div key={c.id} style={{background:"#fff",borderRadius:10,padding:"11px 12px",border:`1px solid ${border}`,boxShadow:"0 1px 4px rgba(0,65,255,.05)"}}>
+            {c.editing?<div>
+              <input value={editDraft[c.id]?.author||""} onChange={e=>setEditDraft(d=>({...d,[c.id]:{...d[c.id],author:e.target.value}}))}
+                placeholder="이름" style={{width:"100%",border:`1.5px solid ${accent}`,borderRadius:6,padding:"5px 8px",fontSize:12,marginBottom:6,background:"#fff"}}/>
+              <textarea value={editDraft[c.id]?.text||""} onChange={e=>setEditDraft(d=>({...d,[c.id]:{...d[c.id],text:e.target.value}}))}
+                style={{width:"100%",border:`1.5px solid ${accent}`,borderRadius:6,padding:"6px 8px",fontSize:12,resize:"none",lineHeight:1.5,minHeight:60,background:"#fff"}}/>
+              <div style={{display:"flex",gap:6,marginTop:6}}>
+                <button onClick={()=>saveEdit(c.id)} style={{flex:1,padding:"5px",border:"none",borderRadius:6,background:accent,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>저장</button>
+                <button onClick={()=>cancelEdit(c.id)} style={{flex:1,padding:"5px",border:`1px solid ${border}`,borderRadius:6,background:"#fff",color:"#888",fontSize:11,cursor:"pointer"}}>취소</button>
+              </div>
+            </div>:<div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  <div style={{width:22,height:22,borderRadius:11,background:tagColors[ci],display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:tagTextColors[ci],flexShrink:0}}>
+                    {c.author.charAt(0)}
+                  </div>
+                  <span style={{fontSize:11,fontWeight:700,color:"#333",letterSpacing:"-0.2px"}}>{c.author}</span>
+                  {c.edited&&<span style={{fontSize:9,color:"#aaa"}}>(수정됨)</span>}
+                </div>
+                <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <span style={{fontSize:9,color:"#bbb"}}>{c.ts}</span>
+                  <button onClick={()=>startEdit(c)} style={{border:"none",background:"none",cursor:"pointer",padding:"2px",color:"#aaa",fontSize:11,lineHeight:1}}>✏</button>
+                  <button onClick={()=>deleteComment(c.id)} style={{border:"none",background:"none",cursor:"pointer",padding:"2px",color:"#ccc",fontSize:11,lineHeight:1}}>✕</button>
+                </div>
+              </div>
+              <div style={{fontSize:12,color:"#444",lineHeight:1.6,letterSpacing:"-0.2px",wordBreak:"break-all"}}>{c.text}</div>
+            </div>}
+          </div>;
+        })}
+      </div>
+
+      {/* 입력창 */}
+      <div style={{borderTop:`1px solid ${border}`,padding:"10px 12px 12px",flexShrink:0,background:panelBg}}>
+        <input value={draft.author} onChange={e=>setDraft(d=>({...d,author:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&textRef.current&&textRef.current.focus()}
+          placeholder="이름 (선택)" style={{width:"100%",border:`1.5px solid ${border}`,borderRadius:7,padding:"6px 10px",fontSize:12,marginBottom:6,background:"#fff",letterSpacing:"-0.2px"}}/>
+        <textarea ref={textRef} value={draft.text} onChange={e=>setDraft(d=>({...d,text:e.target.value}))}
+          onKeyDown={e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey))addComment();}}
+          placeholder={`${SCREEN_LABELS[screen]||screen} 화면 의견 입력…\n(Ctrl+Enter로 등록)`}
+          style={{width:"100%",border:`1.5px solid ${border}`,borderRadius:7,padding:"8px 10px",fontSize:12,resize:"none",lineHeight:1.5,minHeight:68,background:"#fff",marginBottom:6,letterSpacing:"-0.2px"}}/>
+        <button onClick={addComment} disabled={!draft.text.trim()}
+          style={{width:"100%",padding:"8px",border:"none",borderRadius:7,background:draft.text.trim()?accent:"#C5CCEE",color:"#fff",fontWeight:700,fontSize:12,cursor:draft.text.trim()?"pointer":"default",letterSpacing:"-0.3px",transition:"background .15s"}}>
+          의견 등록
+        </button>
+      </div>
+    </div>}
+  </div>;
+}
+
+/* ═══ APP ROOT ═══ */
+function App(){
+  const [nav,setNav]=useState("home");
+  const [screen,setScreen]=useState("home");
+  const [showSchedule,setShowSchedule]=useState(false);
+  const [showFishing,setShowFishing]=useState(false);
+
+  // 마스터상품 상태
+  const [masterProducts,setMasterProducts]=useState(initMasterProducts);
+  // 일자별상품 상태
+  const [dailyProducts,setDailyProducts]=useState(initDailyProducts);
+  // 홈/예약 화면 호환용 products (일자별상품 → legacy 형태 변환)
+  const products=dailyProducts.map(d=>({
+    id:d.id,name:d.bpiName,price:d.bpiAdultRate,
+    capacity:d.bpiQty,sold:d.sold,
+    status:d.bpiIsDisplay?"selling":"stop",
+    date:d.date,depart:d.bpiSReleaseTime,arrive:d.bpiEReleaseTime,
+    type:d.bpiReleaseDay==="T"?"당일":"야간",
+    fish:d.fishSpecies,minBuy:1,memo:"",
+  }));
+  const setProducts=()=>{}; // no-op (legacy compat)
+
+  const [manualRsvs,setManualRsvs]=useState([]);
+  const [toast,setToast]=useState("");
+  const [selectedBoatId,setSelectedBoatId]=useState(1);
+  const onSelectBoat=id=>{setSelectedBoatId(id);};
+
+  const goNav=k=>{setNav(k);setScreen(k);};
+  const goBack=()=>setScreen(nav);
+  const addManualRsv=rsv=>{
+    setManualRsvs(p=>[rsv,...p]);
+    setDailyProducts(ps=>ps.map(p=>p.id===rsv.prodId?{...p,sold:p.sold+rsv.adults+(rsv.kids||0)}:p));
+  };
+  const handleEmergencyCancel=()=>{
+    setToast("출항 취소 처리 완료 · 예약 고객 6명에게 알림 발송");
+  };
+  const allRsvs=[...manualRsvs,...RESERVATIONS];
+  const bp={selectedBoatId,onSelectBoat}; // boat props shorthand
+
+  const renderScreen=()=>{
+    switch(screen){
+      case"home":return <HomeScreen onScheduleModal={()=>setShowSchedule(true)} onGoReservation={()=>setScreen("reservation")} products={products} onEmergencyCancel={handleEmergencyCancel} allRsvs={allRsvs} {...bp}/>;
+      case"settlement":return <SettlementScreen onDetail={()=>setScreen("settlementDetail")} {...bp}/>;
+      case"settlementDetail":return <SettlementDetailScreen onBack={goBack}/>;
+      case"reservation":return <ReservationScreen onBack={goBack} allRsvs={allRsvs} addManualRsv={addManualRsv} products={products} {...bp}/>;
+      case"product":return <ProductListScreen
+        products={products} setProducts={setProducts}
+        masterProducts={masterProducts} setMasterProducts={setMasterProducts}
+        dailyProducts={dailyProducts} setDailyProducts={setDailyProducts}
+        addManualRsv={addManualRsv} allRsvs={allRsvs} {...bp}
+      />;
+      case"fishing":return <FishingReportScreen onAdd={()=>setShowFishing(true)} {...bp}/>;
+      case"notice":return <NoticeScreen {...bp}/>;
+      default:return <HomeScreen onScheduleModal={()=>setShowSchedule(true)} onGoReservation={()=>setScreen("reservation")} products={products} {...bp}/>;
+    }
+  };
+  const hideNav=["reservation","settlementDetail"].includes(screen);
+
+  return <div style={{display:"flex",justifyContent:"center",minHeight:"100vh",background:"#d6d6d6",alignItems:"flex-start"}}>
+    {/* 앱 프레임 — willChange:transform으로 position:fixed 자식들을 이 컨테이너 기준으로 고정 */}
+    <div style={{width:390,minHeight:"100vh",background:C.bg2,display:"flex",flexDirection:"column",position:"relative",overflowX:"hidden",willChange:"transform",flexShrink:0}}>
+      {renderScreen()}
+      {!hideNav&&<BottomNav active={nav} onNav={goNav}/>}
+      {showSchedule&&<ScheduleModal onClose={()=>setShowSchedule(false)}/>}
+      {showFishing&&<FishingModal onClose={()=>setShowFishing(false)}/>}
+      {toast&&<Toast msg={toast} onDone={()=>setToast("")}/>}
+    </div>
+    {/* 의견 패널 */}
+    <FeedbackPanel screen={screen}/>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
